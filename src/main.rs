@@ -148,10 +148,6 @@ fn row_to_json(row: &Row) -> Result<Value> {
     Ok(Value::Object(obj))
 }
 
-fn get_table_name(conn: &mut Connection) -> Result<String> {
-    todo!()
-}
-
 fn index_page(
     args: &Args,
     env: &mut minijinja::Environment,
