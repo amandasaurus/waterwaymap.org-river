@@ -1,0 +1,5 @@
+/target/
+/dictfiles/
+/*zstd-dict*
+*.db
+*.db-journal

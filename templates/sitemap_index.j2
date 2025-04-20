@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sitemapindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
+    xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<sitemap><loc>https://waterwaymap.org/sitemap_base.xml</loc></sitemap>
+{%- for url_path in url_paths %}
+	<sitemap><loc>https://waterwaymap.org{{ url_path|xml_encode }}</loc></sitemap>
+{%- endfor %}
+</sitemapindex>

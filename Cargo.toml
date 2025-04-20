@@ -1,0 +1,27 @@
+[package]
+name = "riversite"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wwm-riversite"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.95"
+clap = { version = "4.5.30", features = ["derive"] }
+minijinja = { version = "2.7.0", features = ["loader"] }
+rayon = "1.10.0"
+rusqlite = { version = "0.33.0", features = ["load_extension"] }
+
+libsqlitesite = { path = "/home/amanda/personal/sqlitesite/libsqlitesite/" }
+serde = "1.0.217"
+serde_json = "1.0.138"
+crossbeam = "0.8.4"
+crossbeam-channel = "0.5.14"
+indicatif = "0.17.11"
+walkdir = "2.5.0"
+env_logger = "0.11.6"
+log = "0.4.26"
+num-format = "0.4.4"
+zstd = "0.13.3"

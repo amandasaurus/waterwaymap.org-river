@@ -1,0 +1,15 @@
+{% extends "base.j2" %}
+{% block title %}Index of names of Rivers{% endblock %}
+{% block description %}Index of names of Rivers{% endblock %}
+{% block body %}
+
+<h1>Index to names on WaterwayMap.org</h1>
+
+<ul>
+  {% for index_page in index_pages %}
+  <li><a href="{{ ("name-index/" ~ index_page[0])|c14n_url_prefix }}">{{ index_page[1] }} → {{ index_page[2] }}</a></li>
+  {% endfor %}
+
+</ul>
+
+{% endblock %}

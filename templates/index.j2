@@ -1,0 +1,23 @@
+{% extends "base.j2" %}
+{% block title %}WaterwayMap Rivers{% endblock %}
+{% block description %}A complete list of rivers & streams in the world, based on OpenStreetMap data.{% endblock %}
+{% block url_path %}{{ url_prefix }}{% endblock %}
+{% block body %}
+
+  <h1>WaterwayMap Rivers</h1>
+
+  <p>Here is a directory of all rivers & waterways in the world, take from OpenStreetMap.</a>
+
+  <p>All named rivers are listed in the <a href="{{url_prefix}}name-index/">Name Index</a></p>
+
+<details open>
+  <summary>Top 500 rivers that flow into the sea:</summary>
+  <p></p>
+  <ul>
+{%- for river in stream_level0s %}
+      <li data-name="{{ river['name'] }}" data-length-m="{{ river['length_m'] }}"><a href="{{url_prefix}}{{river['path']}}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+{%- endfor %}
+  </ul>
+</details>
+
+{% endblock %}

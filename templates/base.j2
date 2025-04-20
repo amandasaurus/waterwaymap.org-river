@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+	<head><title>{% block title %}{% endblock %}</title>
+		<link rel="icon" href="data:," />
+		<link rel="canonical" href="https://waterwaymap.org{% block url_path %}{% endblock %}" />
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="description" content="{% block description %}{% endblock %}">
+		<meta
+				name="ahrefs-site-verification"
+				content="c9513759ebdea3ec02e6720d40892389897fbb4cd1b944bfc60d65223d2d66b5"
+				/>
+		<script data-goatcounter="https://waterwaymaporg.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+		<script src="https://analytics.ahrefs.com/analytics.js" data-key="+UOoLceZfZWhhOXLhKSmkg" defer="true"></script>
+		<link rel="stylesheet" href="{{ url_prefix }}css/style.css" />
+		<link rel="stylesheet" href="{{ url_prefix }}css/lib/bootstrap-5.3.3.min.css" />
+		<link rel="stylesheet" href="{{ url_prefix }}css/lib/bootstrap-icons-1.11.3.min.css" />
+		<link rel="stylesheet" href="{{ url_prefix }}css/lib/maplibre-gl-5.0.1.css" />
+		<script src="{{ url_prefix }}js/lib/maplibre-gl-5.0.1.js"></script>
+		<script src="{{ url_prefix }}js/htmx-v2.0.4.js"></script>
+		<script defer src="{{ url_prefix }}js/lib/alpine-3.12.3.js"></script>
+		<script src="{{ url_prefix }}js/lib/bootstrap-5.3.3.bundle.min.js" async></script>
+
+		<!-- Facebook Meta Tags -->
+		<meta property="og:url" content="https://waterwaymap.org{{ self.url_path() }}" />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="{{ self.title() }}" />
+		<meta
+		  property="og:description"
+		  content="{{ self.description() }}"
+		/>
+		<meta property="og:image" content="/img/screenshot.png" />
+
+		<!-- htmx settings -->
+		<meta name="htmx-config" content='{"ignoreTitle": true}'>
+
+
+		{% block extra_head_content %}{% endblock %}
+	</head>
+
+<body>
+  <main class="container">
+  {% block body %}
+  {% endblock %}
+
+  </main>
+  <footer class=footer>
+    <div class=container>
+      
+      <a href="https://WaterwayMap.org/">WaterwayMap.org</a>
+	  | <a href="{{ "name-index/"|c14n_url_prefix }}">River Name Index</a>
+	  | This website is <a href="https://creativecommons.org/licenses/by-sa/4.0/">© CC-BY-SA 4.0</a>. The source data is <a href="https://openstreetmap.org/copyright">© OpenStreetMap Contributors</a>, and is open data licenced under <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>
+    </div>
+  </footer>
+  {% block pre_body_end%}{% endblock %}
+</body>
+</html>

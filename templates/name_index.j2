@@ -1,0 +1,24 @@
+{% extends "base.j2" %}
+{% block title %}Index {{ from }} → {{ to }}{% endblock %}
+{% block body %}
+
+<h1>Rivers from {{ from }} → {{ to }}</h1>
+
+<ul>
+  {% for river in rivers %}
+  <li><a href="{{ river['url_path'] }}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+  {% endfor %}
+
+</ul>
+
+{% if prev %}
+Previous: <a rel=prev href="{{url_prefix}}name-index/{{ prev['i'] }}/">{{ prev['from'] }} → {{ prev['to'] }}</a>
+{% endif %}
+{% if next %}
+Next: <a rel=next href="{{url_prefix}}name-index/{{ next['i'] }}/">{{ next['from'] }} → {{ next['to'] }}</a>
+{% endif %}
+
+
+
+
+{% endblock %}
