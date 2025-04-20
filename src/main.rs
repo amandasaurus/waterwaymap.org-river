@@ -34,27 +34,27 @@ const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
 #[derive(Parser, Debug)]
 struct Args {
     /// Input GeoPackage data
-    #[arg(short, long = "input", value_name="DATA.gpkg")]
+    #[arg(short, long = "input", value_name = "DATA.gpkg")]
     input_data: PathBuf,
 
     /// The table, in the input data sqlite file, which has the river data
-    #[arg(long, value_name="TABLE", default_value="planet-grouped-waterways")]
+    #[arg(long, value_name = "TABLE", default_value = "planet-grouped-waterways")]
     table_name: PathBuf,
 
     /// All the static files to add
-    #[arg(long = "static", value_name="STATIC_DIR/")]
+    #[arg(long = "static", value_name = "STATIC_DIR/")]
     static_dir: PathBuf,
 
     /// The templates are hosted here.
-    #[arg(long = "templates", value_name="TEMPLATES_DIR/")]
+    #[arg(long = "templates", value_name = "TEMPLATES_DIR/")]
     template_dir: PathBuf,
 
     /// Save the pages to this sqlitesite file
-    #[arg(short, long = "output", value_name="OUTPUT.sqlitesite")]
+    #[arg(short, long = "output", value_name = "OUTPUT.sqlitesite")]
     output_site_db: PathBuf,
 
     /// Everything is hosted under this URL
-    #[arg(long = "prefix", value_name="/URL/PREFIX")]
+    #[arg(long = "prefix", value_name = "/URL/PREFIX")]
     url_prefix: PathBuf,
 }
 
@@ -113,7 +113,7 @@ fn main() -> Result<()> {
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
     )?;
-	
+
     individual_river_pages(
         &args,
         &mut env,
@@ -149,11 +149,11 @@ fn row_to_json(row: &Row) -> Result<Value> {
 }
 
 fn get_table_name(conn: &mut Connection) -> Result<String> {
-	todo!()
+    todo!()
 }
 
 fn index_page(
-	args: &Args,
+    args: &Args,
     env: &mut minijinja::Environment,
     output_site_db: &mut SqliteSite,
     global_http_response_headers: &[(&str, &str)],
@@ -193,7 +193,7 @@ fn index_page(
     Ok(())
 }
 fn name_index_pages(
-	args: &Args,
+    args: &Args,
     env: &mut minijinja::Environment,
     output_site_db: &mut SqliteSite,
     global_http_response_headers: &[(&str, &str)],
@@ -370,7 +370,7 @@ fn name_index_pages(
 }
 
 fn individual_river_pages(
-	args: &Args,
+    args: &Args,
     env: &mut minijinja::Environment,
     output_site_db: &mut SqliteSite,
     global_http_response_headers: &[(&str, &str)],
