@@ -2,6 +2,8 @@
 
 The code & templates which powers the [OpenStreetMap River Database on WaterwayMap.org (`waterwaymap.org/river/`)](https://waterwaymap.org/river/)
 
+This programme is called by the [WaterwayMap.org build proces](https://github.com/amandasaurus/waterwaymap.org/blob/main/Makefile).
+
 ## See also
 
 * [WaterwayMap.org Source Code on Github](https://github.com/amandasaurus/waterwaymap.org/)
