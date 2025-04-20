@@ -695,7 +695,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "waterwaymaporg_riversite"
+name = "waterwaymaporg_river"
 version = "0.1.0"
 dependencies = [
  "anyhow",

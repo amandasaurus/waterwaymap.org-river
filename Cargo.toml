@@ -1,11 +1,11 @@
 [package]
-name = "waterwaymaporg_riversite"
+name = "waterwaymaporg_river"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
-name = "wwm-riversite"
+name = "wwm-river"
 path = "src/main.rs"
 
 [dependencies]
