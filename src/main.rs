@@ -62,7 +62,7 @@ fn connect_to_db() -> Result<Client> {
 fn main() -> Result<()> {
     let global_start = Instant::now();
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init();
 
     let args = Args::parse();
@@ -656,16 +656,17 @@ fn individual_region_pages(
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let mut conn = connect_to_db()?;
+    let mut conn1 = connect_to_db()?;
+    let mut conn2 = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let num_regions: i64 = conn.query_one(r#"select count(*) as admin from admins;"#, &[])?.get(0);
+    let num_regions: i64 = conn1.query_one(r#"select count(*) as admin from admins;"#, &[])?.get::<_, i64>(0);
     info!(
         "Need to create {} individual admin region pages.",
         num_regions.to_formatted_string(&Locale::en)
     );
     let template = env.get_template("admin_region.j2")?;
     let region_url = url_prefix.join("region");
-    let mut admin2s = Vec::with_capacity(200);
+    let mut admin0s = HashMap::with_capacity(200);
 
     let html_hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
@@ -679,34 +680,53 @@ fn individual_region_pages(
     let bar = ProgressBar::new(num_regions as u64);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {human_pos:>7}/{human_len:7} {per_sec:>10}. eta: {eta} Region",
+            "[{elapsed_precise}] {human_pos:>7}/{human_len:7} {per_sec:>10}. eta: {eta} Doing {msg}",
         )
         .unwrap()
     );
 
-    let admin_rivers = r#"select
-            a.ogc_fid as admin_ogc_fid,
-            a.name as admin_name, a.admin_level,
-            ww.tag_group_value as ww_name, ww.length_m,
-            ww.min_nid
-        from 
-            planet_grouped_waterways as ww JOIN admins as a ON ST_Intersects(a.geom, ww.geom)
-        WHERE a.admin_level = '2'
-        ORDER by a.ogc_fid"#;
+    let rivers_in_admin_sql = conn2.prepare(r#"select
+        tag_group_value as name, length_m, min_nid
+        from planet_grouped_waterways
+        WHERE ST_Intersects(geom, (select geom from admins where ogc_fid = $1 limit 1))
+        AND length_m >= 100
+        "#)?;
 
-    let mut rivers_in_admin = conn.query_raw(admin_rivers, &[] as &[bool;0])?;
-    let mut rivers_in_admin_iter_raw = std::iter::from_fn(|| rivers_in_admin.next().ok().flatten().and_then(|pgrow| row_to_json(pgrow).ok()));
+    let subregions_sql = conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
+    let parent_region_sql = conn2.prepare("select name, iso from admins WHERE iso = $1 limit 1")?;
 
-    let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
+    let admins = r#"select ogc_fid, name, iso, parent_iso, level
+        from admins
+        WHERE name IS NOT NULL
+        order by level, iso, name
+        "#;
+
+    let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool;0])?;
+    let mut rivers_in_admin_iter = std::iter::from_fn(|| rivers_in_admin.next().ok().flatten().and_then(|pgrow| row_to_json(pgrow).ok()));
+
+    //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
+    let set_url_path = |mut admin: &mut Value| {
+        let mut admin_url = region_url.clone();
+        admin_url.push(format!("{}-{}",
+                               admin["iso"].as_str().unwrap(),
+                               &admin["name"].as_str().unwrap_or("n/a")));
+        admin["url_path"] = admin_url.display().to_string().into();
+    };
+
 
     let mut chunk = Vec::new();
-    for (admin_id, chunk_iter) in rivers_in_admin_iter.into_iter() {
+    for mut admin in rivers_in_admin_iter.into_iter() {
         bar.inc(1);
+        bar.set_message(format!("{} {}", admin.get("iso").map_or("", |s| s.as_str().unwrap()), admin.get("name").map_or("", |s| s.as_str().unwrap())));
         chunk.truncate(0);
-        chunk.extend(chunk_iter);
+        let mut rows =  conn2.query_raw(&rivers_in_admin_sql, &[admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32])?;
+        while let Some(row) = rows.next()? {
+            chunk.push(row_to_json(row)?);
+        }
         if chunk.is_empty() {
             continue;
         }
+        drop(rows);
         chunk.par_sort_by_key(|r| OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap()));
 
         chunk.par_iter_mut().for_each(|river| {
@@ -721,37 +741,43 @@ fn individual_region_pages(
             river["url_path"] = url.into();
         });
 
-        let name = chunk[0].get("admin_name").and_then(|s| s.as_str()).unwrap();
-        let admin_level = chunk[0].get("admin_level").and_then(|s| s.as_str()).unwrap();
-        let mut admin_url = region_url.clone();
-        admin_url.push(format!("{}-{}", admin_level, name_hash(name)));
+        let iso_code = admin.get("iso").and_then(Value::as_str).unwrap();
+        set_url_path(&mut admin);
+        admin["num_rivers"] = chunk.len().into();
+        admin["num_subregions"] = 0.into();
+        //admin["long_rivers"] = chunk.iter().take(5).collect::<Vec<_>>().into();
+        
+        let mut subregions = conn2.query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?.into_iter().map(row_to_json).collect::<Result<Vec<_>>>()?;
+        subregions.par_iter_mut().for_each(set_url_path);
+        admin["subregions"] = subregions.into();
 
+        if admin.get("level").unwrap().as_i64() == 0.into() {
+            admin0s.insert(admin["iso"].as_str().unwrap().to_string(), admin.clone());
+        }
 
-        let region = json!({"admin_name": name, "admin_level": admin_level, "url_path": admin_url, "num_rivers": chunk.len(), "long_rivers": chunk.iter().take(5).collect::<Vec<_>>()});
+        admin["parent_region"] = admin.get("parent_iso").and_then(Value::as_str).and_then(|parent_iso| admin0s.get(parent_iso)).cloned().into();
 
 
         output_site_db.set_url(
-            c14n_url_w_slash(admin_url.to_str().unwrap()),
+            c14n_url_w_slash(admin["url_path"].as_str().unwrap()),
             None,
             None,
             env.get_template("admin_region.j2")?
-                .render(context!(region => region, rivers=> chunk))?,
+                .render(context!(region => admin, rivers=> chunk))?,
         )?;
 
-        if admin_level == "2" {
-            admin2s.push(region);
-        }
         // template
     }
 
-    admin2s.par_sort_by(|a, b| a["admin_name"].as_str().cmp(&b["admin_name"].as_str()));
+    let mut admin0s = admin0s.into_iter().map(|(_k, v)| v).collect::<Vec<_>>();
+    admin0s.par_sort_by(|a, b| a.get("name").and_then(Value::as_str).cmp(&b.get("name").and_then(Value::as_str)));
 
     output_site_db.set_url(
         c14n_url_w_slash(region_url.to_str().unwrap()),
         None,
         None,
         env.get_template("admin_region_index.j2")?
-            .render(context!(regions => admin2s))?,
+            .render(context!(regions => admin0s))?,
     )?;
 
     Ok(())

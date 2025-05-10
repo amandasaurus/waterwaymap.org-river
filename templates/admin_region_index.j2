@@ -7,7 +7,7 @@
 <div class=regions>
 <ul>
 	{% for region in regions %}
-		<li><a href="{{ region['url_path'] }}">{{ region['admin_name'] }}</a>. {{ region["num_rivers"] }} waterway(s)</li>
+		<li><a href="{{ region['url_path'] }}">{{ region['name'] }}</a>. {{ region["num_rivers"] }} waterway(s)</li>
 	{% endfor %}
 </ul>
 </div>

@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
-    if name == "unnamed" {
+    if name == "(unnamed)" {
         format!("{}-{:012}", name, min_nid)
 	} else {
 		format!("{}.{:012}", name_hash(name), min_nid)

@@ -1,17 +1,40 @@
 {% extends "base.j2" %}
-{% block title %}{{ region.admin_name|xml_encode }}{% endblock %}
+{% block title %}{{ region.name|xml_encode }}{% endblock %}
 {% block body %}
 
-<h1>{{ region.admin_name }}</h1>
+<h1>
+{% if region.parent_region %}<a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a> → {% endif %}
+{{ region.name }}
+</h1>
 
-<h2>Rivers in {{ region.admin_name }}</h2>
+{% if region.parent_region %}
+{{ region.name }} is in <a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a>.
+{% endif %}
 
+<h2>Rivers</h2>
+<details open>
+<summary>{{ region.num_rivers }} rivers</summary>
 <div class=rivers>
 <ul>
 	{% for river in rivers %}
-		<li><a href="{{ river['url_path'] }}">{{ river['ww_name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+		<li><a href="{{ river['url_path'] }}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
 	{% endfor %}
 </ul>
 </div>
+</details>
+
+{% if region.subregions|length > 0 %}
+<h2>Sub-regions</h2>
+
+<details open>
+<summary>{{ region.subregions|length }} subregions</summary>
+<div class=subregions>
+<ul>
+	{% for subregion in region.subregions %}
+		<li><a href="{{ subregion.url_path }}">{{ subregion.name }}</a></li>
+	{% endfor %}
+</ul>
+</div>
+{% endif %}
 
 {% endblock %}
