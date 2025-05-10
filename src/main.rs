@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use itertools::Itertools;
 use libsqlitesite::c14n_url_w_slash;
 use libsqlitesite::SqliteSite;
 use log::{info, warn};
@@ -96,21 +95,21 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    //name_index_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    name_index_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
-    //individual_river_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    individual_river_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
     individual_region_pages(
         &args,
@@ -154,7 +153,7 @@ fn do_query(
     stmt: &impl postgres::ToStatement,
     args: &[&(dyn postgres::types::ToSql + Sync)],
 ) -> Result<Vec<serde_json::Value>> {
-    conn.query(stmt, &[])?
+    conn.query(stmt, args)?
         .into_iter()
         .map(row_to_json)
         .collect::<Result<Vec<serde_json::Value>>>()
@@ -678,7 +677,6 @@ fn individual_region_pages(
         "Need to create {} individual admin region pages.",
         num_regions.to_formatted_string(&Locale::en)
     );
-    let template = env.get_template("admin_region.j2")?;
     let region_url = url_prefix.join("region");
     let mut admin0s = HashMap::with_capacity(200);
 
@@ -710,7 +708,6 @@ fn individual_region_pages(
 
     let subregions_sql =
         conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
-    let parent_region_sql = conn2.prepare("select name, iso from admins WHERE iso = $1 limit 1")?;
 
     let admins = r#"select ogc_fid, name, iso, parent_iso, level
         from admins
@@ -774,7 +771,6 @@ fn individual_region_pages(
             river["url_path"] = url.into();
         });
 
-        let iso_code = admin.get("iso").and_then(Value::as_str).unwrap();
         set_url_path(&mut admin);
         admin["num_rivers"] = chunk.len().into();
         admin["num_subregions"] = 0.into();
@@ -843,15 +839,6 @@ fn individual_region_pages(
     )?;
 
     Ok(())
-}
-
-fn rm_admin_props(mut val: serde_json::Value) -> serde_json::Value {
-    let m = val.as_object_mut().unwrap();
-    m.remove("admin_level");
-    m.remove("admin_name");
-    m.remove("admin_ogc_fid");
-    drop(m);
-    val
 }
 
 fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
