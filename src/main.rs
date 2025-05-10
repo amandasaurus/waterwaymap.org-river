@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -38,7 +39,7 @@ struct Args {
     input_data: PathBuf,
 
     /// The table, in the input data sqlite file, which has the river data
-    #[arg(long, value_name = "TABLE", default_value = "planet-grouped-waterways")]
+    #[arg(long, value_name = "TABLE", default_value = "planet_grouped_waterways")]
     table_name: PathBuf,
 
     /// All the static files to add
@@ -106,7 +107,23 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    name_index_pages(
+    //name_index_pages(
+    //    &args,
+    //    &mut env,
+    //    &mut output_site_db,
+    //    global_http_response_headers.as_slice(),
+    //    &zstd_dictionaries,
+    //)?;
+
+    //individual_river_pages(
+    //    &args,
+    //    &mut env,
+    //    &mut output_site_db,
+    //    global_http_response_headers.as_slice(),
+    //    &zstd_dictionaries,
+    //)?;
+
+    individual_region_pages(
         &args,
         &mut env,
         &mut output_site_db,
@@ -114,13 +131,6 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    individual_river_pages(
-        &args,
-        &mut env,
-        &mut output_site_db,
-        global_http_response_headers.as_slice(),
-        &zstd_dictionaries,
-    )?;
 
     info!(
         "Finished all in {}",
@@ -207,6 +217,14 @@ fn name_index_pages(
         num_index_pages
     );
 
+    let bar = ProgressBar::new(num_index_pages);
+    bar.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Index pages",
+        )
+        .unwrap(),
+    );
+
     let name_index_url = url_prefix.join("name-index");
     let mut urls_all_sitemaps: Vec<String> = Vec::new();
 
@@ -267,6 +285,7 @@ fn name_index_pages(
     let sitemap_template = env.get_template("sitemap.j2")?;
     let mut urls_for_sitemap: Vec<String> = vec![];
     for (bin_index, bin_start, bin_end) in index_pages {
+        bar.inc(1);
         urls_for_sitemap.truncate(0);
         let this_index_page_url = c14n_url_w_slash(
             name_index_url
@@ -414,8 +433,8 @@ fn individual_river_pages(
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
-            AsGeoJSON(ST_Multi(ST_Simplify(GeomFromGPB(geom),0.00001))) as geom,
-            AsGeoJSON(ST_Expand(GeomFromGPB(geom), 0.001)) as bbox
+            AsGeoJSON(ST_Multi(ST_Simplify(geom,0.00001))) as geom,
+            AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from "{table_name}"
             ORDER BY length_m desc
             ;
@@ -652,6 +671,98 @@ fn add_static_files(
         dir.display(),
         added_bytes
     );
+
+    Ok(())
+}
+
+fn individual_region_pages(
+    args: &Args,
+    env: &mut minijinja::Environment,
+    output_site_db: &mut SqliteSite,
+    global_http_response_headers: &[(&str, &str)],
+    zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
+) -> Result<()> {
+    let conn = connect_to_db(&args.input_data)?;
+    let table_name = args.table_name.display().to_string();
+    let url_prefix = &args.url_prefix;
+    let num_regions: u64 = conn.query_row(
+        &format!(r#"select count(*) as admin from admins;"#, ),
+        [],
+        |row| row.get(0),
+    )?;
+    info!(
+        "Need to create {} individual admin region pages.",
+        num_regions.to_formatted_string(&Locale::en)
+    );
+    let template = env.get_template("admin_region.j2")?;
+
+    let html_hdr_idx = output_site_db.get_or_create_http_response_headers_id(
+        http_headers_for_fileext("html", global_http_response_headers),
+    )?;
+    let html_zstd_dict = zstd_dictionaries.get("html");
+    let html_zstd_dict_id = html_zstd_dict.map(|x| x.0);
+    let mut html_zstd_dict_comp = html_zstd_dict
+        .map(|x| Compressor::with_dictionary(3, &x.1))
+        .transpose()?;
+
+    let bar = ProgressBar::new(num_regions);
+    bar.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Region",
+        )
+        .unwrap()
+    );
+
+    let admin_list_query =r#" select ogc_fid, admin_level, name from admins where admin_level IS NOT NULL AND name IS NOT NULL; "#;
+    let mut stmt = conn.prepare(&admin_list_query)?;
+    let regions_iter = stmt
+        .query_map([], |row| Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)))?
+        .filter_map(Result::ok)
+    ;
+
+    let rivers_in_admin_sql = r#"WITH admin_bbox AS (
+          SELECT
+            MbrMinX(geom) AS minx,
+            MbrMinY(geom) AS miny,
+            MbrMaxX(geom) AS maxx,
+            MbrMaxY(geom) AS maxy,
+            geom AS admin_geom
+          FROM admins
+          WHERE ogc_fid = ?1
+        )
+
+        -- Join spatial index to get candidate geometries
+        SELECT 
+            tag_group_value as name, min_nid, length_m
+        FROM admin_bbox ab
+        JOIN idx_planet_grouped_waterways_geom idx
+          ON idx.xmin <= ab.maxx
+         AND idx.xmax >= ab.minx
+         AND idx.ymin <= ab.maxy
+         AND idx.ymax >= ab.miny
+
+        -- Join to main table on pk
+        JOIN planet_grouped_waterways pw ON pw.ROWID = idx.pkid
+
+        -- Apply exact spatial predicate
+        WHERE Intersects(ab.admin_geom, pw.geom)
+        "#;
+
+    let mut rivers_in_admin = conn.prepare(&rivers_in_admin_sql)?;
+
+    for mut region in regions_iter {
+        let region: (u64, u32, String) = (region.0, region.1.parse().unwrap(), region.2);
+        let mut rivers: Vec<serde_json::Value> = rivers_in_admin
+            .query_map([region.0], |row| Ok(row_to_json(row)))?
+            .filter_map(Result::ok)
+            .filter_map(Result::ok) // WTF why double?
+            .collect::<Vec<_>>();
+        bar.inc(1);
+        if rivers.is_empty() {
+            continue;
+        }
+
+    }
 
     Ok(())
 }
