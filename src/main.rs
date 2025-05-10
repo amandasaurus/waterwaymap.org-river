@@ -52,13 +52,6 @@ struct Args {
     url_prefix: PathBuf,
 }
 
-fn connect_to_db() -> Result<Client> {
-    Ok(Client::connect(
-        "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"",
-        NoTls,
-    )?)
-}
-
 fn main() -> Result<()> {
     let global_start = Instant::now();
     env_logger::builder()
@@ -911,4 +904,11 @@ fn get_or_create_zstd_dictionaries(
             (dict_id, zstd_dictionary_bytes.to_vec().into_boxed_slice()),
         );
     }
+}
+
+fn connect_to_db() -> Result<Client> {
+    Ok(Client::connect(
+        "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"",
+        NoTls,
+    )?)
 }
