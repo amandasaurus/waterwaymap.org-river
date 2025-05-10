@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use minijinja::State;
 use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
@@ -60,9 +61,10 @@ pub(crate) fn calculate_hash<T: Hash>(t: &T) -> u64 {
 }
 
 /// Parse this json string into the json object
-pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) {
-    let new_val = serde_json::from_str(val.as_str().unwrap()).unwrap();
+pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) -> Result<()> {
+    let new_val = serde_json::from_str(val.as_str().context("inner json value not a str")?)?;
     let _ = std::mem::replace(val, new_val);
+	Ok(())
 }
 
 /// Round this float to this many places after the decimal point.

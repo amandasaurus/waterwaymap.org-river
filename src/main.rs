@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -88,13 +89,13 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    name_index_pages(
-        &args,
-        &mut env,
-        &mut output_site_db,
-        global_http_response_headers.as_slice(),
-        &zstd_dictionaries,
-    )?;
+    //name_index_pages(
+    //    &args,
+    //    &mut env,
+    //    &mut output_site_db,
+    //    global_http_response_headers.as_slice(),
+    //    &zstd_dictionaries,
+    //)?;
 
     individual_river_pages(
         &args,
@@ -104,13 +105,13 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    individual_region_pages(
-        &args,
-        &mut env,
-        &mut output_site_db,
-        global_http_response_headers.as_slice(),
-        &zstd_dictionaries,
-    )?;
+    //individual_region_pages(
+    //    &args,
+    //    &mut env,
+    //    &mut output_site_db,
+    //    global_http_response_headers.as_slice(),
+    //    &zstd_dictionaries,
+    //)?;
 
     info!(
         "Finished all in {}",
@@ -133,7 +134,8 @@ fn row_to_json(row: Row) -> Result<Value> {
             postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
             postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
-            _ => unimplemented!("Unknown type {:?}", col.type_()), //rusqlite::types::Value::Null => json!(null),
+            postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
+            _ => unimplemented!("Unknown type {:?}", col.type_()),
         };
         obj.insert(column_name.to_string(), value);
     }
@@ -197,7 +199,7 @@ fn name_index_pages(
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
     let index_max = 1000;
-    let total_names: i64 = conn.query_one(r#"select count(distinct tag_group_value) as total from "{}" where tag_group_value IS NOT NULL;"#, &[])?.get(0);
+    let total_names: i64 = conn.query_one(r#"select count(distinct tag_group_value) as total from planet_grouped_waterways where tag_group_value IS NOT NULL;"#, &[])?.get(0);
     let num_index_pages = (total_names as f64 / index_max as f64).ceil() as u64;
     info!(
         "There are {} unique names, resulting in {} index pages.",
@@ -208,7 +210,7 @@ fn name_index_pages(
     let bar = ProgressBar::new(num_index_pages);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Index pages",
+            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Index pages {msg}",
         )
         .unwrap(),
     );
@@ -249,7 +251,7 @@ fn name_index_pages(
         num_index_pages = num_index_pages
     );
     let stmt = conn.prepare(&query)?;
-    let index_pages: Vec<(i64, String, String)> = conn
+    let index_pages: Vec<(i32, String, String)> = conn
         .query(&stmt, &[])?
         .into_iter()
         .map(|row| (row.get(0), row.get(1), row.get(2)))
@@ -263,7 +265,7 @@ fn name_index_pages(
             .render(context!(index_pages => index_pages))?,
     )?;
 
-    let query = r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= ?1 and tag_group_value <= ?2 order by tag_group_value;"#;
+    let query = r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#;
     let stmt = conn.prepare(query)?;
 
     let template = env.get_template("name_index.j2")?;
@@ -416,10 +418,11 @@ fn individual_river_pages(
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
-            AsGeoJSON(ST_Multi(ST_Simplify(geom,0.00001))) as geom,
-            AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
+            ST_AsGeoJSON(ST_Multi(ST_Simplify(geom,0.00001))) as geom,
+            ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
             ORDER BY length_m desc
+            LIMIT 10000
             ;
 	  "#;
     let stmt = conn.prepare(query)?;
@@ -446,20 +449,20 @@ fn individual_river_pages(
         )
         .into();
         let url = url_prefix.join(river["path"].as_str().unwrap());
-        parse_inner_json_value(&mut river["stream_level_code"]);
-        parse_inner_json_value(&mut river["distributaries_sea"]);
-        parse_inner_json_value(&mut river["side_channels"]);
-        parse_inner_json_value(&mut river["branching_distributaries"]);
-        parse_inner_json_value(&mut river["terminal_distributaries"]);
-        parse_inner_json_value(&mut river["tributaries"]);
-        parse_inner_json_value(&mut river["geom"]);
+        //parse_inner_json_value(&mut river["stream_level_code"])?;
+        //parse_inner_json_value(&mut river["distributaries_sea"])?;
+        //parse_inner_json_value(&mut river["side_channels"])?;
+        //parse_inner_json_value(&mut river["branching_distributaries"])?;
+        //parse_inner_json_value(&mut river["terminal_distributaries"])?;
+        //parse_inner_json_value(&mut river["tributaries"])?;
+        parse_inner_json_value(&mut river["geom"])?;
 
         river["num_tributaries"] = river["tributaries"].as_array().unwrap().len().into();
         river["num_distributaries"] = (river["terminal_distributaries"].as_array().unwrap().len()
             + river["branching_distributaries"].as_array().unwrap().len())
         .into();
 
-        parse_inner_json_value(&mut river["bbox"]);
+        parse_inner_json_value(&mut river["bbox"])?;
         let bbox = river["bbox"]["coordinates"][0].as_array().unwrap();
         let mut bbox = [
             bbox[0][0].as_f64().unwrap(),
@@ -523,7 +526,9 @@ fn individual_river_pages(
             "URL {} already exists in the site",
             url.display()
         );
-        river["url"] = url.to_str().into();
+        river["url"] = c14n_url_w_slash(url.display().to_string()).into();
+
+        // Render the template!
         let content = template.render(&river)?;
         let mut content = content.into_bytes();
         anyhow::ensure!(!content.is_empty());
@@ -534,7 +539,7 @@ fn individual_river_pages(
         }
 
         output_site_db_bulk_adder.add_unique_url(
-            url.to_str().unwrap(),
+            c14n_url_w_slash(url.display().to_string()),
             html_zstd_dict_id,
             html_hdr_idx,
             content,
@@ -554,23 +559,6 @@ fn individual_river_pages(
             content,
         )?;
     }
-
-    //	//	data_to_render = {
-    //	//	  'bin_number': index_page['bin_number'],
-    //		  'from': index_page['bin_start'],
-    //		  'to': index_page['bin_end'],
-    //		  'entries': entries,
-    //		  'num_index_pages': len(index_pages),
-    //		}
-    //		i = index_page['bin_number'] - 1
-    //		if i > 0:
-    //			data_to_render['prev'] = {'i': i+1-1, 'from': index_pages[i-1]['bin_start'], 'to': index_pages[i-1]['bin_end']}
-    //		if i < len(index_pages)-1:
-    //			data_to_render['next'] = {'i': i+1+1, 'from': index_pages[i+1]['bin_start'], 'to': index_pages[i+1]['bin_end']}
-    //		html = name_index_template.render(data_to_render)
-    //
-    //		with open(output_dir / "name-index" / str(index_page['bin_number']) / "index.html", "wb") as output_fp:
-    //			output_fp.write(html.encode("utf8"))
 
     output_site_db_bulk_adder.finish()?;
 
