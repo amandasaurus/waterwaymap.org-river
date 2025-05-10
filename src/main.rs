@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
