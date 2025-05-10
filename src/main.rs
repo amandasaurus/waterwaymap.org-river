@@ -55,7 +55,7 @@ struct Args {
 }
 
 fn connect_to_db() -> Result<Client> {
-    Ok(Client::connect("", NoTls)?)
+    Ok(Client::connect("host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"", NoTls)?)
 }
 
 fn main() -> Result<()> {
@@ -134,7 +134,13 @@ fn row_to_json(row: Row) -> Result<Value> {
         let column_name = col.name();
         let value: Value = match col.type_() {
             &postgres::types::Type::BOOL => json!(row.get::<_, bool>(i)),
-            _ => unimplemented!()
+            &postgres::types::Type::CHAR => json!(row.get::<_, String>(i)),
+            &postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
+            &postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
+            &postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
+            &postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
+            &postgres::types::Type::VARCHAR => json!(row.get::<_, String>(i)),
+            _ => unimplemented!("Unknown type {:?}", col.type_())
             //rusqlite::types::Value::Null => json!(null),
         };
         obj.insert(column_name.to_string(), value);
@@ -158,7 +164,7 @@ fn index_page(
 ) -> Result<()> {
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let mut stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from \"{}\" where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
+    let mut stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from planet_grouped_waterways where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
     let mut rows: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[])?;
     rows.par_iter_mut().for_each(|row| {
         if row["name"].is_null() {
@@ -679,10 +685,17 @@ fn individual_region_pages(
 
 
     let mut rivers_in_admin = conn.query_raw(admin_rivers, &[] as &[bool;0])?;
-    let mut rivers_in_admin_iter_raw = std::iter::from_fn(|| Some(rivers_in_admin.next().unwrap().map(row_to_json).unwrap()));
+    let mut rivers_in_admin_iter_raw = std::iter::from_fn(|| rivers_in_admin.next().ok().flatten().and_then(|pgrow| row_to_json(pgrow).ok()));
 
-    let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admins_ogc_fid"));
+    let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admins_ogc_fid").unwrap().clone());
 
+    let mut chunk = Vec::new();
+    for (admin_id, chunk_iter) in rivers_in_admin_iter.into_iter().take(2) {
+        dbg!(admin_id); 
+        chunk.truncate(0);
+        chunk.extend(chunk_iter);
+        dbg!(&chunk);
+    }
     //while let Some(row) = rivers_in_admin.next()? {
     //    let region: (i64, i32, String) = (row.get(0), row.get(1), row.get(2));
     //    bar.inc(1);
