@@ -107,21 +107,21 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    //name_index_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    name_index_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
-    //individual_river_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    individual_river_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
     individual_region_pages(
         &args,
