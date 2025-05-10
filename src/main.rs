@@ -708,9 +708,9 @@ fn individual_region_pages(
     let set_url_path = |mut admin: &mut Value| {
         let mut admin_url = region_url.clone();
         admin_url.push(format!("{}-{}",
-                               admin["iso"].as_str().unwrap(),
-                               &admin["name"].as_str().unwrap_or("n/a")));
-        admin["url_path"] = admin_url.display().to_string().into();
+               admin["iso"].as_str().unwrap(),
+               &admin["name"].as_str().unwrap_or("n/a")));
+        admin["url_path"] = c14n_url_w_slash(admin_url.display().to_string()).into();
     };
 
 
@@ -757,25 +757,40 @@ fn individual_region_pages(
 
         admin["parent_region"] = admin.get("parent_iso").and_then(Value::as_str).and_then(|parent_iso| admin0s.get(parent_iso)).cloned().into();
 
+        let mut content = env.get_template("admin_region.j2")?
+                .render(context!(region => admin, rivers=> chunk))?
+                .into_bytes();
+
+        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+            let new_content = html_zstd_dict_comp.compress(&content)?;
+            let _ = std::mem::replace(&mut content, new_content);
+        }
 
         output_site_db.set_url(
-            c14n_url_w_slash(admin["url_path"].as_str().unwrap()),
-            None,
-            None,
-            env.get_template("admin_region.j2")?
-                .render(context!(region => admin, rivers=> chunk))?,
+            admin["url_path"].as_str().unwrap(),
+            html_zstd_dict_id,
+            html_hdr_idx,
+            content,
         )?;
 
-        // template
     }
 
     let mut admin0s = admin0s.into_iter().map(|(_k, v)| v).collect::<Vec<_>>();
     admin0s.par_sort_by(|a, b| a.get("name").and_then(Value::as_str).cmp(&b.get("name").and_then(Value::as_str)));
 
+    let mut content = env.get_template("admin_region_index.j2")?
+            .render(context!(regions => admin0s))?
+            .into_bytes();
+
+        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+            let new_content = html_zstd_dict_comp.compress(&content)?;
+            let _ = std::mem::replace(&mut content, new_content);
+        }
+
     output_site_db.set_url(
-        c14n_url_w_slash(region_url.to_str().unwrap()),
-        None,
-        None,
+        region_url.to_str().unwrap(),
+        html_zstd_dict_id,
+        html_hdr_idx,
         env.get_template("admin_region_index.j2")?
             .render(context!(regions => admin0s))?,
     )?;

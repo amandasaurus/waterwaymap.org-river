@@ -3,13 +3,9 @@
 {% block body %}
 
 <h1>
-{% if region.parent_region %}<a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a> → {% endif %}
+{% if region.parent_region %}<a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a> / {% endif %}
 {{ region.name }}
 </h1>
-
-{% if region.parent_region %}
-{{ region.name }} is in <a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a>.
-{% endif %}
 
 <h2>Rivers</h2>
 <details open>
