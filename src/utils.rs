@@ -5,18 +5,23 @@ use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
-    let hash = calculate_hash(&name);
-    let name = slugify(name);
     if name == "unnamed" {
-        format!("{}-{:012}/", name, min_nid)
-    } else {
-        format!("{}-{:03}.{:012}/", name, hash % 1000, min_nid)
-    }
+        format!("{}-{:012}", name, min_nid)
+	} else {
+		format!("{}.{:012}", name_hash(name), min_nid)
+	}
 }
+
+pub(crate) fn name_hash(name: &str) -> String {
+	let hash = calculate_hash(&name);
+	let name = slugify(name);
+	format!("{}-{:03}", name, hash % 1000)
+}
+
 
 pub(crate) fn slugify(s: &str) -> String {
     let replace_with_hypen = [' ', '/'];
-    let deletes = ['(', ')', '\'', '\"', '.', '&', '#', '*'];
+    let deletes = ['(', ')', '\'', '\"', '.', '&', '#', '*', ','];
 
     let mut s = s.to_lowercase();
     for c in replace_with_hypen {
