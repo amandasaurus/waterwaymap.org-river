@@ -20,6 +20,7 @@ use std::time::Instant;
 use walkdir::WalkDir;
 use zstd::bulk::Compressor;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 
 mod utils;
 use utils::*;
@@ -110,13 +111,13 @@ fn main() -> Result<()> {
     //    &zstd_dictionaries,
     //)?;
 
-    //individual_region_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    individual_region_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
 
     info!(
@@ -139,7 +140,7 @@ fn row_to_json(row: Row) -> Result<Value> {
             &postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
             &postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
             &postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
-            &postgres::types::Type::VARCHAR => json!(row.get::<_, String>(i)),
+            &postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             _ => unimplemented!("Unknown type {:?}", col.type_())
             //rusqlite::types::Value::Null => json!(null),
         };
@@ -663,6 +664,8 @@ fn individual_region_pages(
         num_regions.to_formatted_string(&Locale::en)
     );
     let template = env.get_template("admin_region.j2")?;
+    let region_url = url_prefix.join("region");
+    let mut admin2s = Vec::with_capacity(200);
 
     let html_hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
@@ -676,36 +679,91 @@ fn individual_region_pages(
     let bar = ProgressBar::new(num_regions as u64);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Region",
+            "[{elapsed_precise}] {human_pos:>7}/{human_len:7} {per_sec:>10}. eta: {eta} Region",
         )
         .unwrap()
     );
 
-    let admin_rivers = r#"select admins.ogc_fid as admins_ogc_fid, * from planet_grouped_waterways JOIN admins ON ST_Intersects(admins.geom, planet_grouped_waterways.geom) ORDER by admins.ogc_fid, planet_grouped_waterways.length_m DESC"#;
-
+    let admin_rivers = r#"select
+            a.ogc_fid as admin_ogc_fid,
+            a.name as admin_name, a.admin_level,
+            ww.tag_group_value as ww_name, ww.length_m,
+            ww.min_nid
+        from 
+            planet_grouped_waterways as ww JOIN admins as a ON ST_Intersects(a.geom, ww.geom)
+        WHERE a.admin_level = '2'
+        ORDER by a.ogc_fid"#;
 
     let mut rivers_in_admin = conn.query_raw(admin_rivers, &[] as &[bool;0])?;
     let mut rivers_in_admin_iter_raw = std::iter::from_fn(|| rivers_in_admin.next().ok().flatten().and_then(|pgrow| row_to_json(pgrow).ok()));
 
-    let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admins_ogc_fid").unwrap().clone());
+    let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
 
     let mut chunk = Vec::new();
-    for (admin_id, chunk_iter) in rivers_in_admin_iter.into_iter().take(2) {
-        dbg!(admin_id); 
+    for (admin_id, chunk_iter) in rivers_in_admin_iter.into_iter() {
+        bar.inc(1);
         chunk.truncate(0);
         chunk.extend(chunk_iter);
-        dbg!(&chunk);
-    }
-    //while let Some(row) = rivers_in_admin.next()? {
-    //    let region: (i64, i32, String) = (row.get(0), row.get(1), row.get(2));
-    //    bar.inc(1);
-    //    if rivers.is_empty() {
-    //        continue;
-    //    }
+        if chunk.is_empty() {
+            continue;
+        }
+        chunk.par_sort_by_key(|r| OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap()));
 
-    //}
+        chunk.par_iter_mut().for_each(|river| {
+            if river["name"].is_null() {
+                river["name"] = "(unnamed)".into();
+            }
+            let path = path(
+                river["name"].as_str().unwrap(),
+                river["min_nid"].as_u64().unwrap(),
+            );
+            let url = url_prefix.join(path.as_str()).display().to_string();
+            river["url_path"] = url.into();
+        });
+
+        let name = chunk[0].get("admin_name").and_then(|s| s.as_str()).unwrap();
+        let admin_level = chunk[0].get("admin_level").and_then(|s| s.as_str()).unwrap();
+        let mut admin_url = region_url.clone();
+        admin_url.push(format!("{}-{}", admin_level, name_hash(name)));
+
+
+        let region = json!({"admin_name": name, "admin_level": admin_level, "url_path": admin_url, "num_rivers": chunk.len(), "long_rivers": chunk.iter().take(5).collect::<Vec<_>>()});
+
+
+        output_site_db.set_url(
+            c14n_url_w_slash(admin_url.to_str().unwrap()),
+            None,
+            None,
+            env.get_template("admin_region.j2")?
+                .render(context!(region => region, rivers=> chunk))?,
+        )?;
+
+        if admin_level == "2" {
+            admin2s.push(region);
+        }
+        // template
+    }
+
+    admin2s.par_sort_by(|a, b| a["admin_name"].as_str().cmp(&b["admin_name"].as_str()));
+
+    output_site_db.set_url(
+        c14n_url_w_slash(region_url.to_str().unwrap()),
+        None,
+        None,
+        env.get_template("admin_region_index.j2")?
+            .render(context!(regions => admin2s))?,
+    )?;
 
     Ok(())
+}
+
+fn rm_admin_props(mut val: serde_json::Value) -> serde_json::Value {
+    let mut m = val.as_object_mut().unwrap();
+    m.remove("admin_level");
+    m.remove("admin_name");
+    m.remove("admin_ogc_fid");
+    drop(m);
+    val
 }
 
 fn setup_jinja_env<'a, 'b>(args: &'a Args) -> Result<minijinja::Environment<'b>> {
