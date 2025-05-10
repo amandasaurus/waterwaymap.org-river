@@ -167,7 +167,7 @@ pub(crate) fn xml_encode(s: String) -> String {
     let s = s.replace("<", "&lt;");
     let s = s.replace(">", "&gt;");
     let s = s.replace("'", "&apos;");
-    let s = s.replace("\"", "&quot;");
+    
 
-    s
+    s.replace("\"", "&quot;")
 }

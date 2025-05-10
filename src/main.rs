@@ -11,7 +11,6 @@ use ordered_float::OrderedFloat;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::{row::Row, Client, NoTls};
 use rayon::prelude::*;
-use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -134,14 +133,14 @@ fn row_to_json(row: Row) -> Result<Value> {
 
     for (i, col) in columns.iter().enumerate() {
         let column_name = col.name();
-        let value: Value = match col.type_() {
-            &postgres::types::Type::BOOL => json!(row.get::<_, bool>(i)),
-            &postgres::types::Type::CHAR => json!(row.get::<_, String>(i)),
-            &postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
-            &postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
-            &postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
-            &postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
-            &postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
+        let value: Value = match *col.type_() {
+            postgres::types::Type::BOOL => json!(row.get::<_, bool>(i)),
+            postgres::types::Type::CHAR => json!(row.get::<_, String>(i)),
+            postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
+            postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
+            postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
+            postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
+            postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             _ => unimplemented!("Unknown type {:?}", col.type_()), //rusqlite::types::Value::Null => json!(null),
         };
         obj.insert(column_name.to_string(), value);
@@ -151,7 +150,7 @@ fn row_to_json(row: Row) -> Result<Value> {
 }
 
 fn do_query(
-    mut conn: &mut Client,
+    conn: &mut Client,
     stmt: &impl postgres::ToStatement,
     args: &[&(dyn postgres::types::ToSql + Sync)],
 ) -> Result<Vec<serde_json::Value>> {
@@ -170,7 +169,7 @@ fn index_page(
 ) -> Result<()> {
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let mut stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from planet_grouped_waterways where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
+    let stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from planet_grouped_waterways where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
     let mut rows: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[])?;
     rows.par_iter_mut().for_each(|row| {
         if row["name"].is_null() {
@@ -257,7 +256,7 @@ fn name_index_pages(
 	  "#,
         num_index_pages = num_index_pages
     );
-    let mut stmt = conn.prepare(&query)?;
+    let stmt = conn.prepare(&query)?;
     let index_pages: Vec<(i64, String, String)> = conn
         .query(&stmt, &[])?
         .into_iter()
@@ -273,7 +272,7 @@ fn name_index_pages(
     )?;
 
     let query = r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= ?1 and tag_group_value <= ?2 order by tag_group_value;"#;
-    let mut stmt = conn.prepare(&query)?;
+    let stmt = conn.prepare(query)?;
 
     let template = env.get_template("name_index.j2")?;
     let sitemap_template = env.get_template("sitemap.j2")?;
@@ -431,7 +430,7 @@ fn individual_river_pages(
             ORDER BY length_m desc
             ;
 	  "#;
-    let mut stmt = conn.prepare(&query)?;
+    let stmt = conn.prepare(query)?;
     let rivers = do_query(&mut conn, &stmt, &[])?;
 
     let bar = ProgressBar::new(total_rivers);
@@ -720,7 +719,7 @@ fn individual_region_pages(
         "#;
 
     let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool; 0])?;
-    let mut rivers_in_admin_iter = std::iter::from_fn(|| {
+    let rivers_in_admin_iter = std::iter::from_fn(|| {
         rivers_in_admin
             .next()
             .ok()
@@ -729,7 +728,7 @@ fn individual_region_pages(
     });
 
     //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
-    let set_url_path = |mut admin: &mut Value| {
+    let set_url_path = |admin: &mut Value| {
         let mut admin_url = region_url.clone();
         admin_url.push(format!(
             "{}-{}",
@@ -740,7 +739,7 @@ fn individual_region_pages(
     };
 
     let mut chunk = Vec::new();
-    for mut admin in rivers_in_admin_iter.into_iter() {
+    for mut admin in rivers_in_admin_iter {
         bar.inc(1);
         bar.set_message(format!(
             "{} {}",
@@ -750,7 +749,7 @@ fn individual_region_pages(
         chunk.truncate(0);
         let mut rows = conn2.query_raw(
             &rivers_in_admin_sql,
-            &[admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32],
+            [admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32],
         )?;
         while let Some(row) = rows.next()? {
             chunk.push(row_to_json(row)?);
@@ -818,7 +817,7 @@ fn individual_region_pages(
         )?;
     }
 
-    let mut admin0s = admin0s.into_iter().map(|(_k, v)| v).collect::<Vec<_>>();
+    let mut admin0s = admin0s.into_values().collect::<Vec<_>>();
     admin0s.par_sort_by(|a, b| {
         a.get("name")
             .and_then(Value::as_str)
@@ -847,7 +846,7 @@ fn individual_region_pages(
 }
 
 fn rm_admin_props(mut val: serde_json::Value) -> serde_json::Value {
-    let mut m = val.as_object_mut().unwrap();
+    let m = val.as_object_mut().unwrap();
     m.remove("admin_level");
     m.remove("admin_name");
     m.remove("admin_ogc_fid");
@@ -855,7 +854,7 @@ fn rm_admin_props(mut val: serde_json::Value) -> serde_json::Value {
     val
 }
 
-fn setup_jinja_env<'a, 'b>(args: &'a Args) -> Result<minijinja::Environment<'b>> {
+fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader(&args.template_dir));
 
@@ -915,7 +914,7 @@ fn get_or_create_zstd_dictionaries(
         ("geojson", include_bytes!("geojson-zstd-dictionary-30K")),
     ];
 
-    for (fileext, zstd_dictionary_bytes) in dicts.into_iter() {
+    for (fileext, zstd_dictionary_bytes) in dicts.iter() {
         let dict_id = output_site_db
             .get_or_create_zstd_dictionary(zstd_dictionary_bytes)
             .unwrap();
