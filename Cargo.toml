@@ -13,7 +13,7 @@ anyhow = "1.0.95"
 clap = { version = "4.5.30", features = ["derive"] }
 minijinja = { version = "2.7.0", features = ["loader"] }
 rayon = "1.10.0"
-rusqlite = { version = "0.33.0", features = ["load_extension"] }
+rusqlite = { version = "*", features = ["load_extension"] }
 
 libsqlitesite = { path = "/home/amanda/personal/sqlitesite/libsqlitesite/" }
 serde = "1.0.217"
