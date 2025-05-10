@@ -2,15 +2,17 @@
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use libsqlitesite::c14n_url_w_slash;
 use libsqlitesite::SqliteSite;
-use postgres::{Client, NoTls, row::Row};
-use postgres::fallible_iterator::FallibleIterator;
 use log::{info, warn};
 use minijinja::{context, Environment};
 use num_format::{Locale, ToFormattedString};
+use ordered_float::OrderedFloat;
+use postgres::fallible_iterator::FallibleIterator;
+use postgres::{row::Row, Client, NoTls};
 use rayon::prelude::*;
-use rusqlite::{Connection};
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -19,8 +21,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use walkdir::WalkDir;
 use zstd::bulk::Compressor;
-use itertools::Itertools;
-use ordered_float::OrderedFloat;
 
 mod utils;
 use utils::*;
@@ -56,7 +56,10 @@ struct Args {
 }
 
 fn connect_to_db() -> Result<Client> {
-    Ok(Client::connect("host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"", NoTls)?)
+    Ok(Client::connect(
+        "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"",
+        NoTls,
+    )?)
 }
 
 fn main() -> Result<()> {
@@ -119,7 +122,6 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-
     info!(
         "Finished all in {}",
         format_duration_human(&global_start.elapsed())
@@ -141,8 +143,7 @@ fn row_to_json(row: Row) -> Result<Value> {
             &postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
             &postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
             &postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
-            _ => unimplemented!("Unknown type {:?}", col.type_())
-            //rusqlite::types::Value::Null => json!(null),
+            _ => unimplemented!("Unknown type {:?}", col.type_()), //rusqlite::types::Value::Null => json!(null),
         };
         obj.insert(column_name.to_string(), value);
     }
@@ -150,9 +151,14 @@ fn row_to_json(row: Row) -> Result<Value> {
     Ok(Value::Object(obj))
 }
 
-fn do_query(mut conn: &mut Client, stmt: &impl postgres::ToStatement, args: &[&(dyn postgres::types::ToSql + Sync)]) -> Result<Vec<serde_json::Value>> {
+fn do_query(
+    mut conn: &mut Client,
+    stmt: &impl postgres::ToStatement,
+    args: &[&(dyn postgres::types::ToSql + Sync)],
+) -> Result<Vec<serde_json::Value>> {
     conn.query(stmt, &[])?
-        .into_iter().map(row_to_json)
+        .into_iter()
+        .map(row_to_json)
         .collect::<Result<Vec<serde_json::Value>>>()
 }
 
@@ -253,8 +259,10 @@ fn name_index_pages(
         num_index_pages = num_index_pages
     );
     let mut stmt = conn.prepare(&query)?;
-    let index_pages: Vec<(i64, String, String)> = conn.query(&stmt, &[])?
-        .into_iter().map(|row| (row.get(0), row.get(1), row.get(2)))
+    let index_pages: Vec<(i64, String, String)> = conn
+        .query(&stmt, &[])?
+        .into_iter()
+        .map(|row| (row.get(0), row.get(1), row.get(2)))
         .collect::<Vec<_>>();
 
     output_site_db.set_url(
@@ -283,7 +291,8 @@ fn name_index_pages(
         .to_string();
         urls_for_sitemap.push(this_index_page_url.clone());
 
-        let mut rivers: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
+        let mut rivers: Vec<serde_json::Value> =
+            do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         rivers.par_iter_mut().for_each(|row| {
             let path = path(
@@ -376,9 +385,14 @@ fn individual_river_pages(
 ) -> Result<()> {
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let total_rivers: u64 = conn.query_one(
-        r#"select count(*) as total from planet_grouped_waterways;"#,
-        &[])?.get::<_, i64>(0).try_into().unwrap();
+    let total_rivers: u64 = conn
+        .query_one(
+            r#"select count(*) as total from planet_grouped_waterways;"#,
+            &[],
+        )?
+        .get::<_, i64>(0)
+        .try_into()
+        .unwrap();
     info!(
         "Need to create {} individual river pages.",
         total_rivers.to_formatted_string(&Locale::en)
@@ -659,7 +673,9 @@ fn individual_region_pages(
     let mut conn1 = connect_to_db()?;
     let mut conn2 = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let num_regions: i64 = conn1.query_one(r#"select count(*) as admin from admins;"#, &[])?.get::<_, i64>(0);
+    let num_regions: i64 = conn1
+        .query_one(r#"select count(*) as admin from admins;"#, &[])?
+        .get::<_, i64>(0);
     info!(
         "Need to create {} individual admin region pages.",
         num_regions.to_formatted_string(&Locale::en)
@@ -685,14 +701,17 @@ fn individual_region_pages(
         .unwrap()
     );
 
-    let rivers_in_admin_sql = conn2.prepare(r#"select
+    let rivers_in_admin_sql = conn2.prepare(
+        r#"select
         tag_group_value as name, length_m, min_nid
         from planet_grouped_waterways
         WHERE ST_Intersects(geom, (select geom from admins where ogc_fid = $1 limit 1))
         AND length_m >= 100
-        "#)?;
+        "#,
+    )?;
 
-    let subregions_sql = conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
+    let subregions_sql =
+        conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
     let parent_region_sql = conn2.prepare("select name, iso from admins WHERE iso = $1 limit 1")?;
 
     let admins = r#"select ogc_fid, name, iso, parent_iso, level
@@ -701,25 +720,39 @@ fn individual_region_pages(
         order by level, iso, name
         "#;
 
-    let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool;0])?;
-    let mut rivers_in_admin_iter = std::iter::from_fn(|| rivers_in_admin.next().ok().flatten().and_then(|pgrow| row_to_json(pgrow).ok()));
+    let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool; 0])?;
+    let mut rivers_in_admin_iter = std::iter::from_fn(|| {
+        rivers_in_admin
+            .next()
+            .ok()
+            .flatten()
+            .and_then(|pgrow| row_to_json(pgrow).ok())
+    });
 
     //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
     let set_url_path = |mut admin: &mut Value| {
         let mut admin_url = region_url.clone();
-        admin_url.push(format!("{}-{}",
-               admin["iso"].as_str().unwrap(),
-               &admin["name"].as_str().unwrap_or("n/a")));
+        admin_url.push(format!(
+            "{}-{}",
+            admin["iso"].as_str().unwrap(),
+            &admin["name"].as_str().unwrap_or("n/a")
+        ));
         admin["url_path"] = c14n_url_w_slash(admin_url.display().to_string()).into();
     };
-
 
     let mut chunk = Vec::new();
     for mut admin in rivers_in_admin_iter.into_iter() {
         bar.inc(1);
-        bar.set_message(format!("{} {}", admin.get("iso").map_or("", |s| s.as_str().unwrap()), admin.get("name").map_or("", |s| s.as_str().unwrap())));
+        bar.set_message(format!(
+            "{} {}",
+            admin.get("iso").map_or("", |s| s.as_str().unwrap()),
+            admin.get("name").map_or("", |s| s.as_str().unwrap())
+        ));
         chunk.truncate(0);
-        let mut rows =  conn2.query_raw(&rivers_in_admin_sql, &[admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32])?;
+        let mut rows = conn2.query_raw(
+            &rivers_in_admin_sql,
+            &[admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32],
+        )?;
         while let Some(row) = rows.next()? {
             chunk.push(row_to_json(row)?);
         }
@@ -727,7 +760,9 @@ fn individual_region_pages(
             continue;
         }
         drop(rows);
-        chunk.par_sort_by_key(|r| OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap()));
+        chunk.par_sort_by_key(|r| {
+            OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap())
+        });
 
         chunk.par_iter_mut().for_each(|river| {
             if river["name"].is_null() {
@@ -746,8 +781,12 @@ fn individual_region_pages(
         admin["num_rivers"] = chunk.len().into();
         admin["num_subregions"] = 0.into();
         //admin["long_rivers"] = chunk.iter().take(5).collect::<Vec<_>>().into();
-        
-        let mut subregions = conn2.query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?.into_iter().map(row_to_json).collect::<Result<Vec<_>>>()?;
+
+        let mut subregions = conn2
+            .query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?
+            .into_iter()
+            .map(row_to_json)
+            .collect::<Result<Vec<_>>>()?;
         subregions.par_iter_mut().for_each(set_url_path);
         admin["subregions"] = subregions.into();
 
@@ -755,11 +794,17 @@ fn individual_region_pages(
             admin0s.insert(admin["iso"].as_str().unwrap().to_string(), admin.clone());
         }
 
-        admin["parent_region"] = admin.get("parent_iso").and_then(Value::as_str).and_then(|parent_iso| admin0s.get(parent_iso)).cloned().into();
+        admin["parent_region"] = admin
+            .get("parent_iso")
+            .and_then(Value::as_str)
+            .and_then(|parent_iso| admin0s.get(parent_iso))
+            .cloned()
+            .into();
 
-        let mut content = env.get_template("admin_region.j2")?
-                .render(context!(region => admin, rivers=> chunk))?
-                .into_bytes();
+        let mut content = env
+            .get_template("admin_region.j2")?
+            .render(context!(region => admin, rivers=> chunk))?
+            .into_bytes();
 
         if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
             let new_content = html_zstd_dict_comp.compress(&content)?;
@@ -772,20 +817,24 @@ fn individual_region_pages(
             html_hdr_idx,
             content,
         )?;
-
     }
 
     let mut admin0s = admin0s.into_iter().map(|(_k, v)| v).collect::<Vec<_>>();
-    admin0s.par_sort_by(|a, b| a.get("name").and_then(Value::as_str).cmp(&b.get("name").and_then(Value::as_str)));
+    admin0s.par_sort_by(|a, b| {
+        a.get("name")
+            .and_then(Value::as_str)
+            .cmp(&b.get("name").and_then(Value::as_str))
+    });
 
-    let mut content = env.get_template("admin_region_index.j2")?
-            .render(context!(regions => admin0s))?
-            .into_bytes();
+    let mut content = env
+        .get_template("admin_region_index.j2")?
+        .render(context!(regions => admin0s))?
+        .into_bytes();
 
-        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
-            let new_content = html_zstd_dict_comp.compress(&content)?;
-            let _ = std::mem::replace(&mut content, new_content);
-        }
+    if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+        let new_content = html_zstd_dict_comp.compress(&content)?;
+        let _ = std::mem::replace(&mut content, new_content);
+    }
 
     output_site_db.set_url(
         region_url.to_str().unwrap(),

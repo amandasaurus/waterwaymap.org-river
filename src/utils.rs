@@ -7,17 +7,16 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
     if name == "(unnamed)" {
         format!("{}-{:012}", name, min_nid)
-	} else {
-		format!("{}.{:012}", name_hash(name), min_nid)
-	}
+    } else {
+        format!("{}.{:012}", name_hash(name), min_nid)
+    }
 }
 
 pub(crate) fn name_hash(name: &str) -> String {
-	let hash = calculate_hash(&name);
-	let name = slugify(name);
-	format!("{}-{:03}", name, hash % 1000)
+    let hash = calculate_hash(&name);
+    let name = slugify(name);
+    format!("{}-{:03}", name, hash % 1000)
 }
-
 
 pub(crate) fn slugify(s: &str) -> String {
     let replace_with_hypen = [' ', '/'];
