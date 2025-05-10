@@ -89,13 +89,13 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    //name_index_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    name_index_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
     individual_river_pages(
         &args,
@@ -105,13 +105,13 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    //individual_region_pages(
-    //    &args,
-    //    &mut env,
-    //    &mut output_site_db,
-    //    global_http_response_headers.as_slice(),
-    //    &zstd_dictionaries,
-    //)?;
+    individual_region_pages(
+        &args,
+        &mut env,
+        &mut output_site_db,
+        global_http_response_headers.as_slice(),
+        &zstd_dictionaries,
+    )?;
 
     info!(
         "Finished all in {}",
@@ -411,22 +411,27 @@ fn individual_river_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let query = r#"
+    let stmt = conn.prepare(r#"
 	    select
             tag_group_value as name,
             min_nid, length_m,
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
-            ST_AsGeoJSON(ST_Multi(ST_Simplify(geom,0.00001))) as geom,
+            ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
             ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
-            ORDER BY length_m desc
-            LIMIT 10000
             ;
-	  "#;
-    let stmt = conn.prepare(query)?;
-    let rivers = do_query(&mut conn, &stmt, &[])?;
+	  "#)?;
+
+    let mut rivers_iter = conn.query_raw(&stmt, &[] as &[bool; 0])?;
+    let rivers_iter = std::iter::from_fn(|| {
+        rivers_iter
+            .next()
+            .ok()
+            .flatten()
+            .and_then(|pgrow| row_to_json(pgrow).ok())
+    });
 
     let bar = ProgressBar::new(total_rivers);
     bar.set_style(
@@ -435,7 +440,7 @@ fn individual_river_pages(
         )
         .unwrap(),
     );
-    for mut river in rivers.into_iter() {
+    for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         if river["name"].is_null() {
             river["is_unnamed"] = true.into();
@@ -449,12 +454,9 @@ fn individual_river_pages(
         )
         .into();
         let url = url_prefix.join(river["path"].as_str().unwrap());
-        //parse_inner_json_value(&mut river["stream_level_code"])?;
-        //parse_inner_json_value(&mut river["distributaries_sea"])?;
-        //parse_inner_json_value(&mut river["side_channels"])?;
-        //parse_inner_json_value(&mut river["branching_distributaries"])?;
-        //parse_inner_json_value(&mut river["terminal_distributaries"])?;
-        //parse_inner_json_value(&mut river["tributaries"])?;
+        if river["geom"].is_null() || river["bbox"].is_null() {
+            dbg!(&river);
+        }
         parse_inner_json_value(&mut river["geom"])?;
 
         river["num_tributaries"] = river["tributaries"].as_array().unwrap().len().into();
@@ -681,9 +683,11 @@ fn individual_region_pages(
     let rivers_in_admin_sql = conn2.prepare(
         r#"select
         tag_group_value as name, length_m, min_nid
-        from planet_grouped_waterways
-        WHERE ST_Intersects(geom, (select geom from admins where ogc_fid = $1 limit 1))
-        AND length_m >= 100
+        from planet_grouped_waterways JOIN ww_in_admin_ranks ON (planet_grouped_waterways.ogc_fid = ww_in_admin_ranks.ww_ogc_fid)
+            JOIN admins ON (admins.ogc_fid = ww_in_admin_ranks.a_ogc_fid)
+        WHERE admins.ogc_fid = $1
+        AND planet_grouped_waterways.length_m >= 100
+        ORDER BY ww_rank_in_a ASC
         "#,
     )?;
 
@@ -812,11 +816,10 @@ fn individual_region_pages(
     }
 
     output_site_db.set_url(
-        region_url.to_str().unwrap(),
+        c14n_url_w_slash(region_url.to_str().unwrap()),
         html_zstd_dict_id,
         html_hdr_idx,
-        env.get_template("admin_region_index.j2")?
-            .render(context!(regions => admin0s))?,
+        content,
     )?;
 
     Ok(())

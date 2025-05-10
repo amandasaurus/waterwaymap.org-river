@@ -62,7 +62,7 @@ pub(crate) fn calculate_hash<T: Hash>(t: &T) -> u64 {
 
 /// Parse this json string into the json object
 pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) -> Result<()> {
-    let new_val = serde_json::from_str(val.as_str().context("inner json value not a str")?)?;
+    let new_val = serde_json::from_str(val.as_str().with_context(|| format!("inner json value not a str, it's {:?}", val))?)?;
     let _ = std::mem::replace(val, new_val);
 	Ok(())
 }
