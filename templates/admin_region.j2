@@ -1,208 +1,40 @@
 {% extends "base.j2" %}
-{% block title %}{{ name|xml_encode }}{% endblock %}
-{% block description %}{{name|xml_encode}} is {{length_m|fmt_length}} long, with {{ num_distributaries }} distributaries and {{ num_tributaries }} tributaries, with max. upstream of {{ max_upstream_m|fmt_length }}{% endblock %}
-{% block url_path %}{{ url }}{% endblock %}
-{% block extra_head_content %}
-    <script src="{{ url_prefix }}js/river_map.js"></script>
-  <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    set_up_map("{{ url_prefix }}{{ path }}geometry.geojson", {{bbox}});
-  });
-</script>
-{% endblock %}
+{% block title %}{{ region.name|xml_encode }}{% endblock %}
 {% block body %}
-  <h1>{{ name }}</h1>
 
-  <p>Based on OpenStreetMap data, {{name}} is {{length_m|fmt_length}} long.</p>
+<h1>
+{% if region.parent_region %}<a href="{{ region.parent_region.url_path }}">{{ region.parent_region.name }}</a> / {% endif %}
+{{ region.name }}
+</h1>
 
-  <h2 id="map">Map of {{name}}</h2>
-  <div id="map_div" style="width: 100%; height: 500px;"></div>
-      <div>
-        This area:
-        <a
-          id="open_on_wwm"
-          x-data
-          href="#"
-          class="inline_centre"
-          target="_blank"
-          @click.prevent="let map = document.map; let url = `https://waterwaymap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
-          @auxclick.prevent="let url = `https://waterwaymap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
-        >
-          WaterwayMap main
-          <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
-        </a>
-        <a
-          id="open_on_osm"
-          x-data
-          href="#"
-          class="inline_centre"
-          target="_blank"
-          @click.prevent="let map = document.map; let url = `https://www.openstreetmap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
-          @auxclick.prevent="let url = `https://www.openstreetmap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
-        >
-          <img
-            src="{{url_prefix}}img/osm.png"
-            alt="OpenStreetMap logo"
-            style="height: 1em"
-          />
-          osm.org <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
-        </a>
-        <span id="open_in_josm" x-data="{show_josm_not_running: false}">
-          <button
-            class="inline_centre"
-            @click="let map = document.map; let b = map.getBounds();
-			let name_filter;
-			if ({{is_unnamed}}) {
-				name_filter = '[!name]';
-			} else {
-				name_filter = `[name=&quot;${encodeURIComponent('{{ name|xml_encode }}')}&quot;]`;
-			}
-			let overpass_q = `way${name_filter}[waterway]{{bbox_bracket}};out meta;>;out meta qt;`;
-			let overpass_url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpass_q)}`;
-			// NB url param w/ overpass ql comes last, otherwise the changeset_source etc gets messed in
-			let josm_url = `http://localhost:8111/import?changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&amp;url=${encodeURIComponent(overpass_url)}`;
-			let res_ok = await fetch(josm_url).then(r => r.ok).catch(e => false);
-			this.disabled = false;
-			if (!res_ok) {
-				show_josm_not_running = true;
-				setTimeout(() => show_josm_not_running=false, 5000);
-			}"
-          >
-            <img src="{{url_prefix}}img/josm.svg" alt="JOSM logo" style="height: 1em" /> edit waterway
-            in josm <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
-          </button>
-          <span x-transition x-show="show_josm_not_running"
-            >JOSM isn't running...</span
-          >
-        </span>
-		<span id="open_area_in_josm" x-data="{show_josm_not_running: false}">
-          <button
-            class="inline_centre"
-            @click="let b = document.map.getBounds();
-					let url = `http://127.0.0.1:8111/load_and_zoom?top=${b.getNorth()}&amp;bottom=${b.getSouth()}&amp;left=${b.getWest()}&amp;right=${b.getEast()}&amp;changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}`;
-					let res_ok = await fetch(url).then(r => r.ok).catch(e => false);
-					this.disabled = false;
-					if (!res_ok) {
-						show_josm_not_running = true;
-						setTimeout(() => show_josm_not_running=false, 5000);
-					}"
-          >
-            <img src="{{url_prefix}}/img/josm.svg" alt="JOSM logo" style="height: 1em" /> edit this map
-            in josm <img src="{{url_prefix}}/img/open_ext.svg" style="height: 1em" />
-          </button>
-          <span x-transition x-show="show_josm_not_running"
-            >JOSM isn't running...</span
-          >
-        </span>
-        <span id="open_in_id" x-data>
-          <button
-            class="inline_centre"
-            class="inline_centre"
-            @click.prevent="let map = document.map; let url = `https://www.openstreetmap.org/edit?editor=id#&source=${encodeURIComponent(location.href)}&hashtags=${encodeURIComponent('#WaterwayMapOrg')}&map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`;
-						window.open(url);"
-            @auxclick.prevent="let url = `https://www.openstreetmap.org/edit?editor=id#&source=${encodeURIComponent(location.href)}&hashtags=${encodeURIComponent('#WaterwayMapOrg')}&map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`;
-						window.open(url);"
-          >
-            <img src="{{url_prefix}}img/id.svg" alt="iD logo" style="height: 1em" />
-            edit map in iD <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
-          </button>
-        </span>
-      </div>
+<p>Here is a list of rivers & waterways in OpenStreetMap in {{ region.name }}. The boundaries of {{ region.name }} are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</p>
+<p>Any waterway which touches this region is included, even if it's mostly outside this region. The length is the total length of the river, not the length in this region.</p>
 
-  <h2>Distributaries / Outflows</h2>
+<h2>Rivers</h2>
+<details open>
+<summary>There are {{ region.num_rivers }} rivers here</summary>
+<div class=rivers>
+<ul>
+	{% for river in rivers %}
+		<li><a href="{{ river['url_path'] }}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+	{% endfor %}
+</ul>
+</div>
+</details>
 
-  {% if side_channels %}
-  <p>
-  It has {{ side_channels|length }} side channels. (TODO fill in side channels)
-  </p>
-  {% endif %}
+{% if region.subregions|length > 0 %}
+<h2>Sub-regions</h2>
 
-
-  <div id=distributaries>
-  <p>
-  {% if distributaries_sea %}
-    {{ name }} flows into the sea:
-    {% for dist in distributaries_sea %}
-      {{ dist['upstream_m']|fmt_length }} of total upstream flows in at {{ dist|fmt_latlng }} at OSM node {{ dist['nid']|fmt_nid }}.
-    {% endfor %}
-  {% endif %}
-  {% if terminal_distributaries|length == 1 %}
-	{{ name }} flows into {{ terminal_distributaries[0]['name']|opt_link_path(terminal_distributaries[0]['path']) }}
-    {%- if terminal_distributaries[0]['confluences']|length == 1 %}
-      , which it joins at
-      {{ terminal_distributaries[0]['confluences'][0]|fmt_latlng }}
-      at OSM node {{ terminal_distributaries[0]['confluences'][0]['nid']|fmt_nid }},
-      and there {{ terminal_distributaries[0]['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
-    {%- elif terminal_distributaries[0]['confluences']|length > 1 %}
-      , which it joins at the following points:
-        {% for conf in terminal_distributaries[0]['confluences'] %}
-          {{ conf['upstream_m']|fmt_length }} of total upstream flows in at
-          {{ conf |fmt_latlng }}
-          at OSM node {{ conf['nid']|fmt_nid }}
-        {% endfor %}
-    {% endif %}
-    {% if 'path' in terminal_distributaries[0] %}
-      <button class="btn btn-outline-secondary btn-sm"
-        hx-select="#distributaries > *" hx-get="{{url_prefix}}{{terminal_distributaries[0]['path']}}"
-        hx-swap=outerHTML>load it's distributaries</button>
-    {% endif %}
-  {% elif terminal_distributaries|length > 1 %}
-	{{ name }} has {{ terminal_distributaries|length }} distributaries.
-    <ul>
-      {% for dist in terminal_distributaries %}
-      <li>
-        {{ dist['name']|opt_link_path(dist['path']) }}
-        {%- if dist['confluences']|length == 1 %}
-          , which it joins at
-          {{ dist['confluences'][0] |fmt_latlng }}
-          at OSM node {{ dist['confluences'][0]['nid']|fmt_nid }},
-          and {{ dist['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
-        {%- elif dist['confluences']|length > 1 %}
-          , which it joins at the following points:
-          {% for conf in dist['confluences'] %}
-            {{ conf['upstream_m']|fmt_length }} of total upstream flows in at
-            {{ conf|fmt_latlng }}
-            at OSM node {{ conf['nid']|fmt_nid }}.
-          {% endfor %}
-        {% endif %}
-        {% if 'path' in dist %}
-          <button class="btn btn-outline-secondary btn-sm" hx-select="#distributaries > *" hx-get="{{url_prefix}}{{dist['path']}}" hx-swap=outerHTML >load it's distributaries</button>
-        {% endif %}
-      </li>
-    {% endfor %}
-    </ul>
-  {% endif %}
-  </p>
-  </div>
-
-
-  <h2>Tributaries</h2>
-  <div id=tributaries>
-  <p>{{ name }} has {{ tributaries|length }} tributaries.</p>
-  <ul>
-  {% for trib in tributaries %}
-    <li data-name="{{ trib['name'] }}">
-      {{ trib['name']|opt_link_path(trib['path']) }}
-      {%- if trib['confluences']|length == 1 %}, which joins it at {{ trib['confluences'][0]|fmt_latlng }} at OSM node {{ trib['confluences'][0]['nid']|fmt_nid }}, and {{ trib['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
-      {%- elif trib['confluences']|length > 1 %}
-        , which joins it at the following points:
-          {% for conf in trib['confluences'] %}
-            {{ conf['upstream_m']|fmt_length }} of total upstream flows in at
-            {{ conf |fmt_latlng }}
-            at OSM node {{ conf['nid']|fmt_nid }}
-          {% endfor %}
-      {% endif %}
-    {% if 'path' in trib %}
-      <div>
-      <button 
-        class="btn btn-outline-secondary btn-sm"
-        hx-select="#tributaries > *" hx-get="{{url_prefix}}{{trib['path']}}" hx-swap=outerHTML>
-        load it's tributaries</button>
-      </div>
-    {% endif %}
-    </li>
-  {% endfor %}
-  </ul>
-  </div>
+<details open>
+<summary>{{ region.subregions|length }} subregions</summary>
+<p>The list of, and boundaries of, these subdivisions are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</a>
+<div class=subregions>
+<ul>
+	{% for subregion in region.subregions %}
+		<li><a href="{{ subregion.url_path }}">{{ subregion.name }}</a></li>
+	{% endfor %}
+</ul>
+</div>
+{% endif %}
 
 {% endblock %}

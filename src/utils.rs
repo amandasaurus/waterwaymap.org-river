@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use minijinja::State;
 use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
@@ -5,18 +6,22 @@ use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
+    if name == "(unnamed)" {
+        format!("{}-{:012}", name, min_nid)
+    } else {
+        format!("{}.{:012}", name_hash(name), min_nid)
+    }
+}
+
+pub(crate) fn name_hash(name: &str) -> String {
     let hash = calculate_hash(&name);
     let name = slugify(name);
-    if name == "unnamed" {
-        format!("{}-{:012}/", name, min_nid)
-    } else {
-        format!("{}-{:03}.{:012}/", name, hash % 1000, min_nid)
-    }
+    format!("{}-{:03}", name, hash % 1000)
 }
 
 pub(crate) fn slugify(s: &str) -> String {
     let replace_with_hypen = [' ', '/'];
-    let deletes = ['(', ')', '\'', '\"', '.', '&', '#', '*'];
+    let deletes = ['(', ')', '\'', '\"', '.', '&', '#', '*', ','];
 
     let mut s = s.to_lowercase();
     for c in replace_with_hypen {
@@ -56,9 +61,10 @@ pub(crate) fn calculate_hash<T: Hash>(t: &T) -> u64 {
 }
 
 /// Parse this json string into the json object
-pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) {
-    let new_val = serde_json::from_str(val.as_str().unwrap()).unwrap();
+pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) -> Result<()> {
+    let new_val = serde_json::from_str(val.as_str().with_context(|| format!("inner json value not a str, it's {:?}", val))?)?;
     let _ = std::mem::replace(val, new_val);
+	Ok(())
 }
 
 /// Round this float to this many places after the decimal point.
@@ -163,7 +169,7 @@ pub(crate) fn xml_encode(s: String) -> String {
     let s = s.replace("<", "&lt;");
     let s = s.replace(">", "&gt;");
     let s = s.replace("'", "&apos;");
-    let s = s.replace("\"", "&quot;");
+    
 
-    s
+    s.replace("\"", "&quot;")
 }

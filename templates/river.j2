@@ -6,7 +6,7 @@
     <script src="{{ url_prefix }}js/river_map.js"></script>
   <script>
   document.addEventListener("DOMContentLoaded", () => {
-    set_up_map("{{ url_prefix }}{{ path }}geometry.geojson", {{bbox}});
+    set_up_map("{{ url }}/geometry.geojson", {{bbox}});
   });
 </script>
 {% endblock %}
@@ -47,6 +47,9 @@
           />
           osm.org <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
         </a>
+		<a href="{{ url }}/geometry.geojson" download="{{ path }}-geometry.geojson">
+			Download GeoJSON
+		</a>
         <span id="open_in_josm" x-data="{show_josm_not_running: false}">
           <button
             class="inline_centre"

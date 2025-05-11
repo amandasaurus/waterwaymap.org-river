@@ -1,0 +1,15 @@
+{% extends "base.j2" %}
+{% block title %}Regions{% endblock %}
+{% block body %}
+
+<h1>Regions</h1>
+
+<div class=regions>
+<ul>
+	{% for region in regions %}
+		<li><a href="{{ region['url_path'] }}">{{ region['name'] }}</a>. {{ region["num_rivers"] }} waterway(s)</li>
+	{% endfor %}
+</ul>
+</div>
+
+{% endblock %}

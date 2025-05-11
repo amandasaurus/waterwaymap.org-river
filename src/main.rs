@@ -1,4 +1,4 @@
-#![allow(warnings)]
+#![allow(dead_code)]
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -7,8 +7,10 @@ use libsqlitesite::SqliteSite;
 use log::{info, warn};
 use minijinja::{context, Environment};
 use num_format::{Locale, ToFormattedString};
+use ordered_float::OrderedFloat;
+use postgres::fallible_iterator::FallibleIterator;
+use postgres::{row::Row, Client, NoTls};
 use rayon::prelude::*;
-use rusqlite::{Connection, Row};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -34,14 +36,6 @@ const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Input GeoPackage data
-    #[arg(short, long = "input", value_name = "DATA.gpkg")]
-    input_data: PathBuf,
-
-    /// The table, in the input data sqlite file, which has the river data
-    #[arg(long, value_name = "TABLE", default_value = "planet_grouped_waterways")]
-    table_name: PathBuf,
-
     /// All the static files to add
     #[arg(long = "static", value_name = "STATIC_DIR/")]
     static_dir: PathBuf,
@@ -59,22 +53,10 @@ struct Args {
     url_prefix: PathBuf,
 }
 
-fn connect_to_db(path: &Path) -> Result<Connection> {
-    let conn = Connection::open(path)?;
-    {
-        let _guard = unsafe { rusqlite::LoadExtensionGuard::new(&conn)? };
-        unsafe {
-            conn.load_extension("/usr/lib/x86_64-linux-gnu/mod_spatialite.so", None)?;
-        }
-    }
-
-    Ok(conn)
-}
-
 fn main() -> Result<()> {
     let global_start = Instant::now();
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init();
 
     let args = Args::parse();
@@ -131,7 +113,6 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-
     info!(
         "Finished all in {}",
         format_duration_human(&global_start.elapsed())
@@ -139,23 +120,38 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn row_to_json(row: &Row) -> Result<Value> {
-    let column_count = row.as_ref().column_count();
+fn row_to_json(row: Row) -> Result<Value> {
+    let columns = row.columns();
     let mut obj = serde_json::Map::new();
 
-    for i in 0..column_count {
-        let column_name = row.as_ref().column_name(i)?.to_string();
-        let value: Value = match row.get::<_, rusqlite::types::Value>(i)? {
-            rusqlite::types::Value::Integer(v) => json!(v),
-            rusqlite::types::Value::Real(v) => json!(v),
-            rusqlite::types::Value::Text(v) => json!(v),
-            rusqlite::types::Value::Blob(v) => json!(v),
-            rusqlite::types::Value::Null => json!(null),
+    for (i, col) in columns.iter().enumerate() {
+        let column_name = col.name();
+        let value: Value = match *col.type_() {
+            postgres::types::Type::BOOL => json!(row.get::<_, bool>(i)),
+            postgres::types::Type::CHAR => json!(row.get::<_, String>(i)),
+            postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
+            postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
+            postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
+            postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
+            postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
+            postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
+            _ => unimplemented!("Unknown type {:?}", col.type_()),
         };
-        obj.insert(column_name, value);
+        obj.insert(column_name.to_string(), value);
     }
 
     Ok(Value::Object(obj))
+}
+
+fn do_query(
+    conn: &mut Client,
+    stmt: &impl postgres::ToStatement,
+    args: &[&(dyn postgres::types::ToSql + Sync)],
+) -> Result<Vec<serde_json::Value>> {
+    conn.query(stmt, args)?
+        .into_iter()
+        .map(row_to_json)
+        .collect::<Result<Vec<serde_json::Value>>>()
 }
 
 fn index_page(
@@ -165,15 +161,10 @@ fn index_page(
     global_http_response_headers: &[(&str, &str)],
     _zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let conn = connect_to_db(&args.input_data)?;
-    let table_name = args.table_name.display().to_string();
+    let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let mut stmt = conn.prepare(&format!("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from \"{}\" where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;", &table_name))?;
-    let mut rows: Vec<serde_json::Value> = stmt
-        .query_map([], |row| Ok(row_to_json(row)))?
-        .filter_map(Result::ok)
-        .filter_map(Result::ok) // WTF why double?
-        .collect::<Vec<_>>();
+    let stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from planet_grouped_waterways where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
+    let mut rows: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[])?;
     rows.par_iter_mut().for_each(|row| {
         if row["name"].is_null() {
             row["is_unnamed"] = true.into();
@@ -205,11 +196,10 @@ fn name_index_pages(
     global_http_response_headers: &[(&str, &str)],
     _zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let conn = connect_to_db(&args.input_data)?;
-    let table_name = args.table_name.display().to_string();
+    let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
     let index_max = 1000;
-    let total_names: u64 = conn.query_row(&format!(r#"select count(distinct tag_group_value) as total from "{}" where tag_group_value IS NOT NULL;"#, table_name), [], |row| row.get(0))?;
+    let total_names: i64 = conn.query_one(r#"select count(distinct tag_group_value) as total from planet_grouped_waterways where tag_group_value IS NOT NULL;"#, &[])?.get(0);
     let num_index_pages = (total_names as f64 / index_max as f64).ceil() as u64;
     info!(
         "There are {} unique names, resulting in {} index pages.",
@@ -220,7 +210,7 @@ fn name_index_pages(
     let bar = ProgressBar::new(num_index_pages);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Index pages",
+            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Index pages {msg}",
         )
         .unwrap(),
     );
@@ -239,7 +229,7 @@ fn name_index_pages(
         r#"
 	  WITH Sorted AS (
 		  SELECT tag_group_value, COUNT(*) AS count
-		  FROM "{table_name}"
+		  FROM planet_grouped_waterways
 		  WHERE tag_group_value IS NOT NULL
 		  GROUP BY tag_group_value
 		ORDER BY tag_group_value
@@ -258,13 +248,13 @@ fn name_index_pages(
 	  GROUP BY bin_number
 	  ORDER BY bin_number;
 	  "#,
-        table_name = table_name,
         num_index_pages = num_index_pages
     );
-    let mut stmt = conn.prepare(&query)?;
-    let index_pages: Vec<(u64, String, String)> = stmt
-        .query_map([], |row| row.try_into())?
-        .filter_map(Result::ok)
+    let stmt = conn.prepare(&query)?;
+    let index_pages: Vec<(i32, String, String)> = conn
+        .query(&stmt, &[])?
+        .into_iter()
+        .map(|row| (row.get(0), row.get(1), row.get(2)))
         .collect::<Vec<_>>();
 
     output_site_db.set_url(
@@ -275,11 +265,8 @@ fn name_index_pages(
             .render(context!(index_pages => index_pages))?,
     )?;
 
-    let query = format!(
-        r#"select tag_group_value as name, min_nid, length_m from "{table_name}" where tag_group_value IS NOT NULL AND tag_group_value >= ?1 and tag_group_value <= ?2 order by tag_group_value;"#,
-        table_name = table_name
-    );
-    let mut stmt = conn.prepare(&query)?;
+    let query = r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#;
+    let stmt = conn.prepare(query)?;
 
     let template = env.get_template("name_index.j2")?;
     let sitemap_template = env.get_template("sitemap.j2")?;
@@ -296,11 +283,8 @@ fn name_index_pages(
         .to_string();
         urls_for_sitemap.push(this_index_page_url.clone());
 
-        let mut rivers: Vec<serde_json::Value> = stmt
-            .query_map([&bin_start, &bin_end], |row| Ok(row_to_json(row)))?
-            .filter_map(Result::ok)
-            .filter_map(Result::ok) // WTF why double?
-            .collect::<Vec<_>>();
+        let mut rivers: Vec<serde_json::Value> =
+            do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         rivers.par_iter_mut().for_each(|row| {
             let path = path(
@@ -391,14 +375,16 @@ fn individual_river_pages(
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let conn = connect_to_db(&args.input_data)?;
-    let table_name = args.table_name.display().to_string();
+    let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let total_rivers: u64 = conn.query_row(
-        &format!(r#"select count(*) as total from "{}";"#, table_name),
-        [],
-        |row| row.get(0),
-    )?;
+    let total_rivers: u64 = conn
+        .query_one(
+            r#"select count(*) as total from planet_grouped_waterways;"#,
+            &[],
+        )?
+        .get::<_, i64>(0)
+        .try_into()
+        .unwrap();
     info!(
         "Need to create {} individual river pages.",
         total_rivers.to_formatted_string(&Locale::en)
@@ -425,27 +411,27 @@ fn individual_river_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let query = format!(
-        r#"
+    let stmt = conn.prepare(r#"
 	    select
             tag_group_value as name,
             min_nid, length_m,
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
-            AsGeoJSON(ST_Multi(ST_Simplify(geom,0.00001))) as geom,
-            AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
-            from "{table_name}"
-            ORDER BY length_m desc
+            ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
+            ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
+            from planet_grouped_waterways
             ;
-	  "#,
-        table_name = table_name,
-    );
-    let mut stmt = conn.prepare(&query)?;
-    let rivers_iter = stmt
-        .query_map([], |row| Ok(row_to_json(row)))?
-        .filter_map(Result::ok)
-        .filter_map(Result::ok); // WTF why double?
+	  "#)?;
+
+    let mut rivers_iter = conn.query_raw(&stmt, &[] as &[bool; 0])?;
+    let rivers_iter = std::iter::from_fn(|| {
+        rivers_iter
+            .next()
+            .ok()
+            .flatten()
+            .and_then(|pgrow| row_to_json(pgrow).ok())
+    });
 
     let bar = ProgressBar::new(total_rivers);
     bar.set_style(
@@ -454,7 +440,7 @@ fn individual_river_pages(
         )
         .unwrap(),
     );
-    for mut river in rivers_iter {
+    for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         if river["name"].is_null() {
             river["is_unnamed"] = true.into();
@@ -468,20 +454,17 @@ fn individual_river_pages(
         )
         .into();
         let url = url_prefix.join(river["path"].as_str().unwrap());
-        parse_inner_json_value(&mut river["stream_level_code"]);
-        parse_inner_json_value(&mut river["distributaries_sea"]);
-        parse_inner_json_value(&mut river["side_channels"]);
-        parse_inner_json_value(&mut river["branching_distributaries"]);
-        parse_inner_json_value(&mut river["terminal_distributaries"]);
-        parse_inner_json_value(&mut river["tributaries"]);
-        parse_inner_json_value(&mut river["geom"]);
+        if river["geom"].is_null() || river["bbox"].is_null() {
+            dbg!(&river);
+        }
+        parse_inner_json_value(&mut river["geom"])?;
 
         river["num_tributaries"] = river["tributaries"].as_array().unwrap().len().into();
         river["num_distributaries"] = (river["terminal_distributaries"].as_array().unwrap().len()
             + river["branching_distributaries"].as_array().unwrap().len())
         .into();
 
-        parse_inner_json_value(&mut river["bbox"]);
+        parse_inner_json_value(&mut river["bbox"])?;
         let bbox = river["bbox"]["coordinates"][0].as_array().unwrap();
         let mut bbox = [
             bbox[0][0].as_f64().unwrap(),
@@ -545,7 +528,9 @@ fn individual_river_pages(
             "URL {} already exists in the site",
             url.display()
         );
-        river["url"] = url.to_str().into();
+        river["url"] = c14n_url_w_slash(url.display().to_string()).into();
+
+        // Render the template!
         let content = template.render(&river)?;
         let mut content = content.into_bytes();
         anyhow::ensure!(!content.is_empty());
@@ -556,7 +541,7 @@ fn individual_river_pages(
         }
 
         output_site_db_bulk_adder.add_unique_url(
-            url.to_str().unwrap(),
+            c14n_url_w_slash(url.display().to_string()),
             html_zstd_dict_id,
             html_hdr_idx,
             content,
@@ -576,23 +561,6 @@ fn individual_river_pages(
             content,
         )?;
     }
-
-    //	//	data_to_render = {
-    //	//	  'bin_number': index_page['bin_number'],
-    //		  'from': index_page['bin_start'],
-    //		  'to': index_page['bin_end'],
-    //		  'entries': entries,
-    //		  'num_index_pages': len(index_pages),
-    //		}
-    //		i = index_page['bin_number'] - 1
-    //		if i > 0:
-    //			data_to_render['prev'] = {'i': i+1-1, 'from': index_pages[i-1]['bin_start'], 'to': index_pages[i-1]['bin_end']}
-    //		if i < len(index_pages)-1:
-    //			data_to_render['next'] = {'i': i+1+1, 'from': index_pages[i+1]['bin_start'], 'to': index_pages[i+1]['bin_end']}
-    //		html = name_index_template.render(data_to_render)
-    //
-    //		with open(output_dir / "name-index" / str(index_page['bin_number']) / "index.html", "wb") as output_fp:
-    //			output_fp.write(html.encode("utf8"))
 
     output_site_db_bulk_adder.finish()?;
 
@@ -682,19 +650,18 @@ fn individual_region_pages(
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let conn = connect_to_db(&args.input_data)?;
-    let table_name = args.table_name.display().to_string();
+    let mut conn1 = connect_to_db()?;
+    let mut conn2 = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let num_regions: u64 = conn.query_row(
-        &format!(r#"select count(*) as admin from admins;"#, ),
-        [],
-        |row| row.get(0),
-    )?;
+    let num_regions: i64 = conn1
+        .query_one(r#"select count(*) as admin from admins;"#, &[])?
+        .get::<_, i64>(0);
     info!(
         "Need to create {} individual admin region pages.",
         num_regions.to_formatted_string(&Locale::en)
     );
-    let template = env.get_template("admin_region.j2")?;
+    let region_url = url_prefix.join("region");
+    let mut admin0s = HashMap::with_capacity(200);
 
     let html_hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
@@ -705,69 +672,160 @@ fn individual_region_pages(
         .map(|x| Compressor::with_dictionary(3, &x.1))
         .transpose()?;
 
-    let bar = ProgressBar::new(num_regions);
+    let bar = ProgressBar::new(num_regions as u64);
     bar.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] {human_pos:>4}/{human_len:4} eta: {eta}. Region",
+            "[{elapsed_precise}] {human_pos:>7}/{human_len:7} {per_sec:>10}. eta: {eta} Doing {msg}",
         )
         .unwrap()
     );
 
-    let admin_list_query =r#" select ogc_fid, admin_level, name from admins where admin_level IS NOT NULL AND name IS NOT NULL; "#;
-    let mut stmt = conn.prepare(&admin_list_query)?;
-    let regions_iter = stmt
-        .query_map([], |row| Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)))?
-        .filter_map(Result::ok)
-    ;
+    let rivers_in_admin_sql = conn2.prepare(
+        r#"select
+        tag_group_value as name, length_m, min_nid
+        from planet_grouped_waterways JOIN ww_in_admin_ranks ON (planet_grouped_waterways.ogc_fid = ww_in_admin_ranks.ww_ogc_fid)
+            JOIN admins ON (admins.ogc_fid = ww_in_admin_ranks.a_ogc_fid)
+        WHERE admins.ogc_fid = $1
+        AND planet_grouped_waterways.length_m >= 100
+        ORDER BY ww_rank_in_a ASC
+        "#,
+    )?;
 
-    let rivers_in_admin_sql = r#"WITH admin_bbox AS (
-          SELECT
-            MbrMinX(geom) AS minx,
-            MbrMinY(geom) AS miny,
-            MbrMaxX(geom) AS maxx,
-            MbrMaxY(geom) AS maxy,
-            geom AS admin_geom
-          FROM admins
-          WHERE ogc_fid = ?1
-        )
+    let subregions_sql =
+        conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
 
-        -- Join spatial index to get candidate geometries
-        SELECT 
-            tag_group_value as name, min_nid, length_m
-        FROM admin_bbox ab
-        JOIN idx_planet_grouped_waterways_geom idx
-          ON idx.xmin <= ab.maxx
-         AND idx.xmax >= ab.minx
-         AND idx.ymin <= ab.maxy
-         AND idx.ymax >= ab.miny
-
-        -- Join to main table on pk
-        JOIN planet_grouped_waterways pw ON pw.ROWID = idx.pkid
-
-        -- Apply exact spatial predicate
-        WHERE Intersects(ab.admin_geom, pw.geom)
+    let admins = r#"select ogc_fid, name, iso, parent_iso, level
+        from admins
+        WHERE name IS NOT NULL
+        order by level, iso, name
         "#;
 
-    let mut rivers_in_admin = conn.prepare(&rivers_in_admin_sql)?;
+    let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool; 0])?;
+    let rivers_in_admin_iter = std::iter::from_fn(|| {
+        rivers_in_admin
+            .next()
+            .ok()
+            .flatten()
+            .and_then(|pgrow| row_to_json(pgrow).ok())
+    });
 
-    for mut region in regions_iter {
-        let region: (u64, u32, String) = (region.0, region.1.parse().unwrap(), region.2);
-        let mut rivers: Vec<serde_json::Value> = rivers_in_admin
-            .query_map([region.0], |row| Ok(row_to_json(row)))?
-            .filter_map(Result::ok)
-            .filter_map(Result::ok) // WTF why double?
-            .collect::<Vec<_>>();
+    //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
+    let set_url_path = |admin: &mut Value| {
+        let mut admin_url = region_url.clone();
+        admin_url.push(format!(
+            "{}-{}",
+            admin["iso"].as_str().unwrap(),
+            &admin["name"].as_str().unwrap_or("n/a")
+        ));
+        admin["url_path"] = c14n_url_w_slash(admin_url.display().to_string()).into();
+    };
+
+    let mut chunk = Vec::new();
+    for mut admin in rivers_in_admin_iter {
         bar.inc(1);
-        if rivers.is_empty() {
+        bar.set_message(format!(
+            "{} {}",
+            admin.get("iso").map_or("", |s| s.as_str().unwrap()),
+            admin.get("name").map_or("", |s| s.as_str().unwrap())
+        ));
+        chunk.truncate(0);
+        let mut rows = conn2.query_raw(
+            &rivers_in_admin_sql,
+            [admin.get("ogc_fid").unwrap().as_i64().unwrap() as i32],
+        )?;
+        while let Some(row) = rows.next()? {
+            chunk.push(row_to_json(row)?);
+        }
+        if chunk.is_empty() {
             continue;
         }
+        drop(rows);
+        chunk.par_sort_by_key(|r| {
+            OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap())
+        });
 
+        chunk.par_iter_mut().for_each(|river| {
+            if river["name"].is_null() {
+                river["name"] = "(unnamed)".into();
+            }
+            let path = path(
+                river["name"].as_str().unwrap(),
+                river["min_nid"].as_u64().unwrap(),
+            );
+            let url = url_prefix.join(path.as_str()).display().to_string();
+            river["url_path"] = url.into();
+        });
+
+        set_url_path(&mut admin);
+        admin["num_rivers"] = chunk.len().into();
+        admin["num_subregions"] = 0.into();
+        //admin["long_rivers"] = chunk.iter().take(5).collect::<Vec<_>>().into();
+
+        let mut subregions = conn2
+            .query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?
+            .into_iter()
+            .map(row_to_json)
+            .collect::<Result<Vec<_>>>()?;
+        subregions.par_iter_mut().for_each(set_url_path);
+        admin["subregions"] = subregions.into();
+
+        if admin.get("level").unwrap().as_i64() == 0.into() {
+            admin0s.insert(admin["iso"].as_str().unwrap().to_string(), admin.clone());
+        }
+
+        admin["parent_region"] = admin
+            .get("parent_iso")
+            .and_then(Value::as_str)
+            .and_then(|parent_iso| admin0s.get(parent_iso))
+            .cloned()
+            .into();
+
+        let mut content = env
+            .get_template("admin_region.j2")?
+            .render(context!(region => admin, rivers=> chunk))?
+            .into_bytes();
+
+        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+            let new_content = html_zstd_dict_comp.compress(&content)?;
+            let _ = std::mem::replace(&mut content, new_content);
+        }
+
+        output_site_db.set_url(
+            admin["url_path"].as_str().unwrap(),
+            html_zstd_dict_id,
+            html_hdr_idx,
+            content,
+        )?;
     }
+
+    let mut admin0s = admin0s.into_values().collect::<Vec<_>>();
+    admin0s.par_sort_by(|a, b| {
+        a.get("name")
+            .and_then(Value::as_str)
+            .cmp(&b.get("name").and_then(Value::as_str))
+    });
+
+    let mut content = env
+        .get_template("admin_region_index.j2")?
+        .render(context!(regions => admin0s))?
+        .into_bytes();
+
+    if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+        let new_content = html_zstd_dict_comp.compress(&content)?;
+        let _ = std::mem::replace(&mut content, new_content);
+    }
+
+    output_site_db.set_url(
+        c14n_url_w_slash(region_url.to_str().unwrap()),
+        html_zstd_dict_id,
+        html_hdr_idx,
+        content,
+    )?;
 
     Ok(())
 }
 
-fn setup_jinja_env<'a, 'b>(args: &'a Args) -> Result<minijinja::Environment<'b>> {
+fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader(&args.template_dir));
 
@@ -827,7 +885,7 @@ fn get_or_create_zstd_dictionaries(
         ("geojson", include_bytes!("geojson-zstd-dictionary-30K")),
     ];
 
-    for (fileext, zstd_dictionary_bytes) in dicts.into_iter() {
+    for (fileext, zstd_dictionary_bytes) in dicts.iter() {
         let dict_id = output_site_db
             .get_or_create_zstd_dictionary(zstd_dictionary_bytes)
             .unwrap();
@@ -837,4 +895,11 @@ fn get_or_create_zstd_dictionaries(
             (dict_id, zstd_dictionary_bytes.to_vec().into_boxed_slice()),
         );
     }
+}
+
+fn connect_to_db() -> Result<Client> {
+    Ok(Client::connect(
+        "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"",
+        NoTls,
+    )?)
 }
