@@ -16,12 +16,12 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 use walkdir::WalkDir;
 use zstd::bulk::Compressor;
 
 mod utils;
 use utils::*;
+
 
 const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
     ("css", &[("content-type", "text/css")]),
@@ -54,7 +54,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    let global_start = Instant::now();
+    let _global = ElapsedPrinter::start("generating everything");
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .init();
@@ -113,10 +113,6 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    info!(
-        "Finished all in {}",
-        format_duration_human(&global_start.elapsed())
-    );
     Ok(())
 }
 
@@ -196,6 +192,8 @@ fn name_index_pages(
     global_http_response_headers: &[(&str, &str)],
     _zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
+    let _name_index_pages = ElapsedPrinter::start("generating name_index_pages");
+
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
     let index_max = 1000;
@@ -379,6 +377,7 @@ fn individual_river_pages(
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
+    let _elapsed = ElapsedPrinter::start("all individual_river_pages");
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
     let total_rivers: u64 = conn

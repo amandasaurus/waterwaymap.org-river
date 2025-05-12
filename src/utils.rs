@@ -4,6 +4,8 @@ use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
 use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::time::Instant;
+use log::info;
 
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
     if name == "(unnamed)" {
@@ -173,3 +175,26 @@ pub(crate) fn xml_encode(s: String) -> String {
 
     s.replace("\"", "&quot;")
 }
+
+pub struct ElapsedPrinter {
+	started: Instant,
+	task_name: String,
+	
+}
+
+impl ElapsedPrinter {
+	pub fn start(task_name: impl Into<String>) -> Self {
+		Self{ task_name: task_name.into(), started: Instant::now() }
+	}
+}
+
+impl Drop for ElapsedPrinter {
+	fn drop(&mut self) {
+		info!(
+			"Finished {} in {}",
+			self.task_name,
+			format_duration_human(&self.started.elapsed())
+		);
+	}
+}
+
