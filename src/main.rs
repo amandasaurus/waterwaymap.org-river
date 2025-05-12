@@ -265,12 +265,14 @@ fn name_index_pages(
             .render(context!(index_pages => index_pages))?,
     )?;
 
-    let query = r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#;
-    let stmt = conn.prepare(query)?;
+    let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
+
+    let stmt = conn.prepare(r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#)?;
 
     let template = env.get_template("name_index.j2")?;
     let sitemap_template = env.get_template("sitemap.j2")?;
     let mut urls_for_sitemap: Vec<String> = vec![];
+
     for (bin_index, bin_start, bin_end) in index_pages {
         bar.inc(1);
         urls_for_sitemap.truncate(0);
@@ -306,7 +308,7 @@ fn name_index_pages(
             "to": bin_end,
         });
 
-        output_site_db.set_url(
+        output_site_db_bulk_adder.add_unique_url(
             &this_index_page_url,
             None,
             html_hdr_idx,
@@ -330,7 +332,7 @@ fn name_index_pages(
                 &this_sitemap_url
             );
         }
-        output_site_db.set_url(
+        output_site_db_bulk_adder.add_unique_url(
             &this_sitemap_url,
             None,
             xml_hdr_idx,
@@ -338,6 +340,8 @@ fn name_index_pages(
         )?;
         urls_all_sitemaps.push(this_sitemap_url);
     }
+
+    output_site_db_bulk_adder.finish()?;
 
     output_site_db.set_url(
         url_prefix.join("sitemap_index.xml").to_str().unwrap(),
