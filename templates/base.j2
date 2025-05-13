@@ -40,6 +40,7 @@
 
 <body>
   <main class="container">
+
   {% block body %}
   {% endblock %}
 
@@ -50,7 +51,9 @@
       <a href="https://WaterwayMap.org/">WaterwayMap.org</a>
 	  | <a href="{{ "name-index/"|c14n_url_prefix }}">River Name Index</a>
 	  | <a href="{{ "region/"|c14n_url_prefix }}">Country Index</a>
-	  | This website is <a href="https://creativecommons.org/licenses/by-sa/4.0/">© CC-BY-SA 4.0</a>. The source data is <a href="https://openstreetmap.org/copyright">© OpenStreetMap Contributors</a>, and is open data licenced under <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>
+	  | WaterwayMap.org <a href="https://creativecommons.org/licenses/by-sa/4.0/">© CC-BY-SA 4.0</a>
+	  | Source Data: <a href="https://openstreetmap.org/copyright">© OpenStreetMap Contributors</a>
+	  | Open data licenced under <a href="https://opendatacommons.org/licenses/odbl/">ODbL</a>
     </div>
   </footer>
   {% block pre_body_end%}{% endblock %}

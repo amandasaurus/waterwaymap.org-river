@@ -12,7 +12,7 @@
 
 <h2>Rivers</h2>
 <details open>
-<summary>There are {{ region.num_rivers }} rivers here</summary>
+<summary>There are {{ region.num_rivers|fmt_num }} rivers here</summary>
 <div class=rivers>
 <ul>
 	{% for river in rivers %}
@@ -26,7 +26,7 @@
 <h2>Sub-regions</h2>
 
 <details open>
-<summary>{{ region.subregions|length }} subregions</summary>
+<summary>{{ region.subregions|length|fmt_num }} subregions</summary>
 <p>The list of, and boundaries of, these subdivisions are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</a>
 <div class=subregions>
 <ul>
