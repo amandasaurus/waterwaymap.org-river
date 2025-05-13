@@ -15,6 +15,12 @@
 
   <p>Based on OpenStreetMap data, {{name}} is {{length_m|fmt_length}} long.</p>
 
+  {% if is_in_regions|length == 1 %}
+  <p>{{ name }} is in {{ is_in_regions[0].name }}, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{% if not loop.first %}, {% endif -%} {{ subregion.name }}{% endfor %}</p>
+  {% elif is_in_regions|length > 1 %}
+  more than 1
+  {% endif %}
+
   <h2 id="map">Map of {{name}}</h2>
   <div id="map_div" style="width: 100%; height: 500px;"></div>
       <div>

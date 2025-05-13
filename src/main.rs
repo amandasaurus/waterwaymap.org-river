@@ -378,9 +378,10 @@ fn individual_river_pages(
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
     let _elapsed = ElapsedPrinter::start("all individual_river_pages");
-    let mut conn = connect_to_db()?;
+    let mut conn1 = connect_to_db()?;
+    let mut conn2 = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let total_rivers: u64 = conn
+    let total_rivers: u64 = conn1
         .query_one(
             r#"select count(*) as total from planet_grouped_waterways;"#,
             &[],
@@ -414,9 +415,11 @@ fn individual_river_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let stmt = conn.prepare(r#"
+    let stmt = conn1.prepare(r#"
 	    select
+            ogc_fid,
             tag_group_value as name,
+            (tag_group_value IS NULL) as is_unnamed,
             min_nid, length_m,
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
@@ -424,10 +427,23 @@ fn individual_river_pages(
             ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
             ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
+            where length_m >= 100000
             ;
 	  "#)?;
 
-    let mut rivers_iter = conn.query_raw(&stmt, &[] as &[bool; 0])?;
+    let river_in_admins_stmt = conn2.prepare(r#"select
+        name, iso
+        from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
+        where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 0
+    "#)?;
+    let river_in_subregions_stmt = conn2.prepare(r#"select
+        name, iso
+        from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
+        where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 1 and admins.parent_iso = $2
+        order by name
+        "#)?;
+
+    let mut rivers_iter = conn1.query_raw(&stmt, &[] as &[bool; 0])?;
     let rivers_iter = std::iter::from_fn(|| {
         rivers_iter
             .next()
@@ -446,10 +462,7 @@ fn individual_river_pages(
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         if river["name"].is_null() {
-            river["is_unnamed"] = true.into();
             river["name"] = "(unnamed)".into();
-        } else {
-            river["is_unnamed"] = false.into();
         }
         river["path"] = path(
             river["name"].as_str().unwrap(),
@@ -532,6 +545,13 @@ fn individual_river_pages(
             url.display()
         );
         river["url"] = c14n_url_w_slash(url.display().to_string()).into();
+
+
+        let mut admin0s = do_query(&mut conn2, &river_in_admins_stmt, &[&(river["ogc_fid"].as_i64().unwrap() as i32)])?;
+        for region in admin0s.iter_mut() {
+            region["subregions"] = do_query(&mut conn2, &river_in_subregions_stmt, &[&(river["ogc_fid"].as_i64().unwrap() as i32), &region["iso"].as_str().unwrap()])?.into();
+        }
+        river["is_in_regions"] = admin0s.into();
 
         // Render the template!
         let content = template.render(&river)?;
