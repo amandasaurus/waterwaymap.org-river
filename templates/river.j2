@@ -18,7 +18,14 @@
   {% if is_in_regions|length == 1 %}
   <p>{{ name }} is in {{ is_in_regions[0].name }}, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{% if not loop.first %}, {% endif -%} {{ subregion.name }}{% endfor %}</p>
   {% elif is_in_regions|length > 1 %}
-  more than 1
+  <p>{{ name }} flows through {{ is_in_regions|length }} countries:
+  <ul>
+	  {% for region in is_in_regions %}
+	  <li>
+		{{ region.name }}, flowing through the subregions of {% for subregion in region["subregions"] %}{% if not loop.first %}, {% endif -%} {{ subregion.name }}{% endfor %}
+	  </li>
+      {% endfor %}
+	</ul>
   {% endif %}
 
   <h2 id="map">Map of {{name}}</h2>

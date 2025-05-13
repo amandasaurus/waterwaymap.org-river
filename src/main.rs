@@ -435,6 +435,7 @@ fn individual_river_pages(
         name, iso
         from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
         where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 0
+		order by admins.name
     "#)?;
     let river_in_subregions_stmt = conn2.prepare(r#"select
         name, iso
