@@ -1,13 +1,17 @@
 {% extends "base.j2" %}
-{% block title %}Regions{% endblock %}
+{% block title %}Waterways {% endblock %}
 {% block body %}
 
 <h1>Regions</h1>
 
+<p>Here is a list of rivers & waterways in OpenStreetMap broken down by region. The boundaries are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</p>
+<p>Any waterway which touches a region is included in that region, even if it's mostly outside this region. A river can be in more than one region. The length is the total length of the river, not the length in this region.</p>
+<p><span><a href="/river/" rel=up>Main River list</a></span><span><a href="/">WaterwayMap.org front page</a></span></p>
+ 
 <div class=regions>
 <ul>
 	{% for region in regions %}
-		<li><a href="{{ region['url_path'] }}">{{ region['name'] }}</a>. {{ region["num_rivers"] }} waterway(s)</li>
+		<li><a href="{{ region['url_path'] }}">{{ region['name'] }}</a>. {{ region["num_rivers"]|fmt_num }} waterway{{ region['num_rivers']|pluralize }}{% if region["num_subregions"] > 0 %}, {{ region["num_subregions"]|fmt_num }} subregion{{ region['num_subregions']|pluralize }}{% endif %}</li>
 	{% endfor %}
 </ul>
 </div>

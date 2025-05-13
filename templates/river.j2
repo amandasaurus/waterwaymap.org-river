@@ -53,17 +53,9 @@
         <span id="open_in_josm" x-data="{show_josm_not_running: false}">
           <button
             class="inline_centre"
+			title="Edit in JOSM"
             @click="let map = document.map; let b = map.getBounds();
-			let name_filter;
-			if ({{is_unnamed}}) {
-				name_filter = '[!name]';
-			} else {
-				name_filter = `[name=&quot;${encodeURIComponent('{{ name|xml_encode }}')}&quot;]`;
-			}
-			let overpass_q = `way${name_filter}[waterway]{{bbox_bracket}};out meta;>;out meta qt;`;
-			let overpass_url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpass_q)}`;
-			// NB url param w/ overpass ql comes last, otherwise the changeset_source etc gets messed in
-			let josm_url = `http://localhost:8111/import?changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&amp;url=${encodeURIComponent(overpass_url)}`;
+			let josm_url = `http://localhost:8111/import?url={{ url }}/geometry.geojson&amp;changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&amp;url=${encodeURIComponent('{{ url }}')}`;
 			let res_ok = await fetch(josm_url).then(r => r.ok).catch(e => false);
 			this.disabled = false;
 			if (!res_ok) {
