@@ -770,6 +770,7 @@ fn individual_region_pages(
             .map(row_to_json)
             .collect::<Result<Vec<_>>>()?;
         subregions.par_iter_mut().for_each(set_url_path);
+        admin["num_subregions"] = subregions.len().into();
         admin["subregions"] = subregions.into();
 
         if admin.get("level").unwrap().as_i64() == 0.into() {
@@ -850,6 +851,15 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
         libsqlitesite::c14n_url_w_slash(format!("/{}/{}", url_prefix2, s))
     });
     env.add_filter("xml_encode", xml_encode);
+
+    env.add_filter("fmt_num", |num: i64| num.to_formatted_string(&Locale::en));
+    env.add_filter("pluralize", |num: i64| {
+		if num == 1 {
+			""
+		} else {
+			"s"
+		}
+	});
 
     Ok(env)
 }
