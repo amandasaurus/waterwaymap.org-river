@@ -22,7 +22,6 @@ use zstd::bulk::Compressor;
 mod utils;
 use utils::*;
 
-
 const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
     ("css", &[("content-type", "text/css")]),
     ("html", &[("content-type", "text/html; charset=utf-8")]),
@@ -415,7 +414,8 @@ fn individual_river_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let stmt = conn1.prepare(r#"
+    let stmt = conn1.prepare(
+        r#"
 	    select
             ogc_fid,
             tag_group_value as name,
@@ -429,20 +429,25 @@ fn individual_river_pages(
             from planet_grouped_waterways
             where length_m >= 100000
             ;
-	  "#)?;
+	  "#,
+    )?;
 
-    let river_in_admins_stmt = conn2.prepare(r#"select
+    let river_in_admins_stmt = conn2.prepare(
+        r#"select
         name, iso, url_path
         from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
         where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 0
 		order by admins.name
-    "#)?;
-    let river_in_subregions_stmt = conn2.prepare(r#"select
+    "#,
+    )?;
+    let river_in_subregions_stmt = conn2.prepare(
+        r#"select
         name, iso, url_path
         from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
         where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 1 and admins.parent_iso = $2
         order by name
-        "#)?;
+        "#,
+    )?;
 
     let mut rivers_iter = conn1.query_raw(&stmt, &[] as &[bool; 0])?;
     let rivers_iter = std::iter::from_fn(|| {
@@ -547,10 +552,21 @@ fn individual_river_pages(
         );
         river["url"] = c14n_url_w_slash(url.display().to_string()).into();
 
-
-        let mut admin0s = do_query(&mut conn2, &river_in_admins_stmt, &[&(river["ogc_fid"].as_i64().unwrap() as i32)])?;
+        let mut admin0s = do_query(
+            &mut conn2,
+            &river_in_admins_stmt,
+            &[&(river["ogc_fid"].as_i64().unwrap() as i32)],
+        )?;
         for region in admin0s.iter_mut() {
-            region["subregions"] = do_query(&mut conn2, &river_in_subregions_stmt, &[&(river["ogc_fid"].as_i64().unwrap() as i32), &region["iso"].as_str().unwrap()])?.into();
+            region["subregions"] = do_query(
+                &mut conn2,
+                &river_in_subregions_stmt,
+                &[
+                    &(river["ogc_fid"].as_i64().unwrap() as i32),
+                    &region["iso"].as_str().unwrap(),
+                ],
+            )?
+            .into();
         }
         river["is_in_regions"] = admin0s.into();
 
@@ -715,8 +731,8 @@ fn individual_region_pages(
         "#,
     )?;
 
-    let subregions_sql =
-        conn2.prepare("select name, iso, url_path from admins WHERE parent_iso = $1 order by name")?;
+    let subregions_sql = conn2
+        .prepare("select name, iso, url_path from admins WHERE parent_iso = $1 order by name")?;
 
     let admins = r#"select ogc_fid, url_path, name, iso, parent_iso, level
         from admins
@@ -866,28 +882,27 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
     env.add_filter("xml_encode", xml_encode);
 
     env.add_filter("fmt_num", |num: i64| num.to_formatted_string(&Locale::en));
-    env.add_filter("pluralize", |num: i64| {
-		if num == 1 {
-			""
-		} else {
-			"s"
-		}
-	});
-    env.add_filter("if_true", |test: bool, output: String| {
-        if test {
-            output
-        } else {
-            "".to_string()
-        }
-    });
-    env.add_filter("if_false", |test: bool, output: String| {
-        if !test {
-            output
-        } else {
-            "".to_string()
-        }
-    });
-
+    env.add_filter("pluralize", |num: i64| if num == 1 { "" } else { "s" });
+    env.add_filter(
+        "if_true",
+        |test: bool, output: String| {
+            if test {
+                output
+            } else {
+                "".to_string()
+            }
+        },
+    );
+    env.add_filter(
+        "if_false",
+        |test: bool, output: String| {
+            if !test {
+                output
+            } else {
+                "".to_string()
+            }
+        },
+    );
 
     Ok(env)
 }

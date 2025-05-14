@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
+use log::info;
 use minijinja::State;
 use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
 use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Instant;
-use log::info;
 
 pub(crate) fn path(name: &str, min_nid: u64) -> String {
     if name == "(unnamed)" {
@@ -64,9 +64,12 @@ pub(crate) fn calculate_hash<T: Hash>(t: &T) -> u64 {
 
 /// Parse this json string into the json object
 pub(crate) fn parse_inner_json_value(val: &mut serde_json::Value) -> Result<()> {
-    let new_val = serde_json::from_str(val.as_str().with_context(|| format!("inner json value not a str, it's {:?}", val))?)?;
+    let new_val = serde_json::from_str(
+        val.as_str()
+            .with_context(|| format!("inner json value not a str, it's {:?}", val))?,
+    )?;
     let _ = std::mem::replace(val, new_val);
-	Ok(())
+    Ok(())
 }
 
 /// Round this float to this many places after the decimal point.
@@ -171,30 +174,30 @@ pub(crate) fn xml_encode(s: String) -> String {
     let s = s.replace("<", "&lt;");
     let s = s.replace(">", "&gt;");
     let s = s.replace("'", "&apos;");
-    
 
     s.replace("\"", "&quot;")
 }
 
 pub struct ElapsedPrinter {
-	started: Instant,
-	task_name: String,
-	
+    started: Instant,
+    task_name: String,
 }
 
 impl ElapsedPrinter {
-	pub fn start(task_name: impl Into<String>) -> Self {
-		Self{ task_name: task_name.into(), started: Instant::now() }
-	}
+    pub fn start(task_name: impl Into<String>) -> Self {
+        Self {
+            task_name: task_name.into(),
+            started: Instant::now(),
+        }
+    }
 }
 
 impl Drop for ElapsedPrinter {
-	fn drop(&mut self) {
-		info!(
-			"Finished {} in {}",
-			self.task_name,
-			format_duration_human(&self.started.elapsed())
-		);
-	}
+    fn drop(&mut self) {
+        info!(
+            "Finished {} in {}",
+            self.task_name,
+            format_duration_human(&self.started.elapsed())
+        );
+    }
 }
-
