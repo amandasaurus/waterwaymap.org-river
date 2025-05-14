@@ -39,7 +39,7 @@
           class="inline_centre"
           target="_blank"
           @click.prevent="let map = document.map; let url = `https://waterwaymap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
-          @auxclick.prevent="let url = `https://waterwaymap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
+          @auxclick.prevent="let map = document.map; let url = `https://waterwaymap.org/#map=${Math.round(map.getZoom())}/${map.getBounds().getCenter().lat}/${map.getBounds().getCenter().lng}`; window.open(url);"
         >
           WaterwayMap main
           <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
@@ -78,25 +78,6 @@
           >
             <img src="{{url_prefix}}img/josm.svg" alt="JOSM logo" style="height: 1em" /> edit waterway
             in josm <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
-          </button>
-          <span x-transition x-show="show_josm_not_running"
-            >JOSM isn't running...</span
-          >
-        </span>
-		<span id="open_area_in_josm" x-data="{show_josm_not_running: false}">
-          <button
-            class="inline_centre"
-            @click="let b = document.map.getBounds();
-					let url = `http://127.0.0.1:8111/load_and_zoom?top=${b.getNorth()}&amp;bottom=${b.getSouth()}&amp;left=${b.getWest()}&amp;right=${b.getEast()}&amp;changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}`;
-					let res_ok = await fetch(url).then(r => r.ok).catch(e => false);
-					this.disabled = false;
-					if (!res_ok) {
-						show_josm_not_running = true;
-						setTimeout(() => show_josm_not_running=false, 5000);
-					}"
-          >
-            <img src="{{url_prefix}}/img/josm.svg" alt="JOSM logo" style="height: 1em" /> edit this map
-            in josm <img src="{{url_prefix}}/img/open_ext.svg" style="height: 1em" />
           </button>
           <span x-transition x-show="show_josm_not_running"
             >JOSM isn't running...</span
