@@ -16,13 +16,13 @@
   <p>Based on OpenStreetMap data, {{name}} is {{length_m|fmt_length}} long.</p>
 
   {% if is_in_regions|length == 1 %}
-  <p>{{ name }} is in {{ is_in_regions[0].name }}, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{% if not loop.first %}, {% endif -%} {{ subregion.name }}{% endfor %}</p>
+  <p>{{ name }} is in <a href="{{url_prefix}}region/{{ is_in_regions[0]["url_path"] }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}</p>
   {% elif is_in_regions|length > 1 %}
   <p>{{ name }} flows through {{ is_in_regions|length }} countries:
   <ul>
 	  {% for region in is_in_regions %}
 	  <li>
-		{{ region.name }}, flowing through the subregions of {% for subregion in region["subregions"] %}{% if not loop.first %}, {% endif -%} {{ subregion.name }}{% endfor %}
+		<a href="{{url_prefix}}region/{{ region["url_path"] }}">{{ region.name }}</a>, flowing through the subregions of {% for subregion in region["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}
 	  </li>
       {% endfor %}
 	</ul>

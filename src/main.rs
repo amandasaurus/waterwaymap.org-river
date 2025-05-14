@@ -432,13 +432,13 @@ fn individual_river_pages(
 	  "#)?;
 
     let river_in_admins_stmt = conn2.prepare(r#"select
-        name, iso
+        name, iso, url_path
         from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
         where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 0
 		order by admins.name
     "#)?;
     let river_in_subregions_stmt = conn2.prepare(r#"select
-        name, iso
+        name, iso, url_path
         from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
         where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 1 and admins.parent_iso = $2
         order by name
@@ -716,9 +716,9 @@ fn individual_region_pages(
     )?;
 
     let subregions_sql =
-        conn2.prepare("select name, iso from admins WHERE parent_iso = $1 order by name")?;
+        conn2.prepare("select name, iso, url_path from admins WHERE parent_iso = $1 order by name")?;
 
-    let admins = r#"select ogc_fid, name, iso, parent_iso, level
+    let admins = r#"select ogc_fid, url_path, name, iso, parent_iso, level
         from admins
         WHERE name IS NOT NULL
         order by level, iso, name
@@ -736,22 +736,14 @@ fn individual_region_pages(
     //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
     let set_url_path = |admin: &mut Value| {
         let mut admin_url = region_url.clone();
-        admin_url.push(format!(
-            "{}-{}",
-            admin["iso"].as_str().unwrap(),
-            &admin["name"].as_str().unwrap_or("n/a")
-        ));
+        admin_url.push(admin["url_path"].as_str().unwrap());
         admin["url_path"] = c14n_url_w_slash(admin_url.display().to_string()).into();
     };
 
     let mut chunk = Vec::new();
     for mut admin in rivers_in_admin_iter {
         bar.inc(1);
-        bar.set_message(format!(
-            "{} {}",
-            admin.get("iso").map_or("", |s| s.as_str().unwrap()),
-            admin.get("name").map_or("", |s| s.as_str().unwrap())
-        ));
+        bar.set_message(admin["url_path"].as_str().unwrap().to_string());
         chunk.truncate(0);
         let mut rows = conn2.query_raw(
             &rivers_in_admin_sql,
@@ -881,6 +873,21 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
 			"s"
 		}
 	});
+    env.add_filter("if_true", |test: bool, output: String| {
+        if test {
+            output
+        } else {
+            "".to_string()
+        }
+    });
+    env.add_filter("if_false", |test: bool, output: String| {
+        if !test {
+            output
+        } else {
+            "".to_string()
+        }
+    });
+
 
     Ok(env)
 }
