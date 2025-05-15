@@ -8,7 +8,7 @@
 </h1>
 
 <p>Here is a list of rivers & waterways in OpenStreetMap in {{ region.name }}. The boundaries of {{ region.name }} are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</p>
-<p>Any waterway which touches this region is included, even if it's mostly outside this region. The length is the total length of the river, not the length in this region.</p>
+<p>Any waterway which touches this region is included, even if it's mostly outside this region. The length is the total length of the river, not the length in this region. Only the longest 20,000 rivers longer than 1 km are shown.</p>
 
 <h2 id=rivers>Rivers</h2>
 <details open>
@@ -31,7 +31,15 @@
 <div class=subregions>
 <ul>
 	{% for subregion in region.subregions %}
-		<li><a href="{{ subregion.url_path }}">{{ subregion.name }}</a></li>
+		<li><a href="{{ subregion.url_path }}">{{ subregion.name }}</a>
+			{{ subregion["num_rivers"]|fmt_num }} waterway{{ subregion['num_rivers']|pluralize }}
+			{%- if subregion["top_rivers"]|length > 0 -%}
+				, including: 
+				{% for river in subregion["top_rivers"] %}
+				{{ loop.first|if_false(", ") }}<a href="/{{ url_prefix }}river/{{ river.url_path }}">{{ river.name }}</a>
+				{% endfor %}
+			{% endif %}
+		</li>
 	{% endfor %}
 </ul>
 </div>

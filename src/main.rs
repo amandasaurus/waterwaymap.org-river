@@ -726,13 +726,18 @@ fn individual_region_pages(
         from planet_grouped_waterways JOIN ww_in_admin_ranks ON (planet_grouped_waterways.ogc_fid = ww_in_admin_ranks.ww_ogc_fid)
             JOIN admins ON (admins.ogc_fid = ww_in_admin_ranks.a_ogc_fid)
         WHERE admins.ogc_fid = $1
-        AND planet_grouped_waterways.length_m >= 100
+        AND planet_grouped_waterways.length_m >= 1000
         ORDER BY ww_rank_in_a ASC
+        LIMIT 20000
         "#,
     )?;
 
     let subregions_sql = conn2
-        .prepare("select name, iso, url_path from admins WHERE parent_iso = $1 order by name")?;
+        .prepare(r"select
+            name, iso, url_path,
+            (select count(*) from ww_a where a_ogc_fid = admins.ogc_fid AND ww_tag_group_value IS NOT NULL and ww_length_m >= 1000) as num_rivers,
+            coalesce((select json_agg(json_build_object('name', ww_tag_group_value, 'url_path', ww_url_path)) from ww_a where a_ogc_fid = admins.ogc_fid and ww_tag_group_value IS NOT NULL AND ww_rank_in_a <= 5), '[]'::json) as top_rivers
+        from admins WHERE parent_iso = $1 order by name")?;
 
     let admins = r#"select ogc_fid, url_path, name, iso, parent_iso, level
         from admins

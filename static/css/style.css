@@ -39,3 +39,7 @@ main.map {
 .mapboxgl-ctrl-bottom-right, .maplibregl-ctrl-bottom-right {
 	right: env(safe-area-inset-right, 0) !important;
 }
+
+ul.inline, ul.inline > li {
+	display: inline;
+}
