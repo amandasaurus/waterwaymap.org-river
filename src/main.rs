@@ -140,7 +140,7 @@ fn row_to_json(row: Row) -> Result<Value> {
 
 fn do_query(
     conn: &mut Client,
-    stmt: &impl postgres::ToStatement,
+    stmt: &(impl postgres::ToStatement + ?Sized),
     args: &[&(dyn postgres::types::ToSql + Sync)],
 ) -> Result<Vec<serde_json::Value>> {
     conn.query(stmt, args)?
@@ -158,21 +158,17 @@ fn index_page(
 ) -> Result<()> {
     let mut conn = connect_to_db()?;
     let url_prefix = &args.url_prefix;
-    let stmt = conn.prepare("select tag_group_value as name, min_nid, length_m, stream_level, stream_level_code from planet_grouped_waterways where tag_group_value IS NOT NULL AND length_m > 20000 order by length_m desc limit 500;")?;
-    let mut rows: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[])?;
-    rows.par_iter_mut().for_each(|row| {
-        if row["name"].is_null() {
-            row["is_unnamed"] = true.into();
-            row["name"] = "(unnamed)".into();
-        } else {
-            row["is_unnamed"] = false.into();
-        }
-        row["path"] = path(
-            row["name"].as_str().unwrap(),
-            row["min_nid"].as_u64().unwrap(),
-        )
-        .into();
-    });
+    let rows: Vec<serde_json::Value> = do_query(&mut conn,
+        "select
+            tag_group_value as name, url_path,
+            min_nid, length_m,
+            stream_level, stream_level_code,
+            coalesce((select json_agg(json_build_object('name', a_name, 'url_path', a_url_path) order by a_name) from ww_a where ww_ogc_fid = ogc_fid and ww_a.a_level = 0), '[]'::json) as countries
+        from
+            planet_grouped_waterways
+        where tag_group_value IS NOT NULL AND length_m > 20000
+        order by length_m desc limit 500;", &[])?;
+
 
     let index_page = env
         .get_template("index.j2")?
@@ -264,7 +260,7 @@ fn name_index_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let stmt = conn.prepare(r#"select tag_group_value as name, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#)?;
+    let stmt = conn.prepare(r#"select tag_group_value as name, url_path, min_nid, length_m from planet_grouped_waterways where tag_group_value IS NOT NULL AND tag_group_value >= $1 and tag_group_value <= $2 order by tag_group_value;"#)?;
 
     let template = env.get_template("name_index.j2")?;
     let sitemap_template = env.get_template("sitemap.j2")?;
@@ -286,11 +282,7 @@ fn name_index_pages(
             do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         rivers.par_iter_mut().for_each(|row| {
-            let path = path(
-                row["name"].as_str().unwrap(),
-                row["min_nid"].as_u64().unwrap(),
-            );
-            row["url_path"] = c14n_url_w_slash(url_prefix.join(path).to_str().unwrap()).into();
+            row["url_path"] = c14n_url_w_slash(url_prefix.join(row["url_path"].as_str().unwrap()).to_str().unwrap()).into();
         });
 
         urls_for_sitemap.extend(
