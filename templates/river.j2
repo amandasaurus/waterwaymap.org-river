@@ -6,7 +6,7 @@
     <script src="{{ url_prefix }}js/river_map.js"></script>
   <script>
   document.addEventListener("DOMContentLoaded", () => {
-    set_up_map("{{ url }}/geometry.geojson", {{bbox}});
+    set_up_map("{{ url }}geometry.geojson", {{bbox}});
   });
 </script>
 {% endblock %}
@@ -116,7 +116,7 @@
     {% endfor %}
   {% endif %}
   {% if terminal_distributaries|length == 1 %}
-	{{ name }} flows into {{ terminal_distributaries[0]['name']|opt_link_path(terminal_distributaries[0]['path']) }}
+	{{ name }} flows into {{ terminal_distributaries[0]['name']|opt_link_path(terminal_distributaries[0]['url_path']) }}
     {%- if terminal_distributaries[0]['confluences']|length == 1 %}
       , which it joins at
       {{ terminal_distributaries[0]['confluences'][0]|fmt_latlng }}
@@ -130,9 +130,9 @@
           at OSM node {{ conf['nid']|fmt_nid }}
         {% endfor %}
     {% endif %}
-    {% if 'path' in terminal_distributaries[0] %}
+    {% if 'url_path' in terminal_distributaries[0] %}
       <button class="btn btn-outline-secondary btn-sm"
-        hx-select="#distributaries > *" hx-get="{{url_prefix}}{{terminal_distributaries[0]['path']}}"
+        hx-select="#distributaries > *" hx-get="{{url_prefix}}{{terminal_distributaries[0]['url_path']}}/"
         hx-swap=outerHTML>load it's distributaries</button>
     {% endif %}
   {% elif terminal_distributaries|length > 1 %}
@@ -140,7 +140,7 @@
     <ul>
       {% for dist in terminal_distributaries %}
       <li>
-        {{ dist['name']|opt_link_path(dist['path']) }}
+        {{ dist['name']|opt_link_path(dist['url_path']) }}
         {%- if dist['confluences']|length == 1 %}
           , which it joins at
           {{ dist['confluences'][0] |fmt_latlng }}
@@ -154,8 +154,8 @@
             at OSM node {{ conf['nid']|fmt_nid }}.
           {% endfor %}
         {% endif %}
-        {% if 'path' in dist %}
-          <button class="btn btn-outline-secondary btn-sm" hx-select="#distributaries > *" hx-get="{{url_prefix}}{{dist['path']}}" hx-swap=outerHTML >load it's distributaries</button>
+        {% if 'url_path' in dist %}
+          <button class="btn btn-outline-secondary btn-sm" hx-select="#distributaries > *" hx-get="{{url_prefix}}{{dist['url_path']}}/" hx-swap=outerHTML >load it's distributaries</button>
         {% endif %}
       </li>
     {% endfor %}
@@ -171,7 +171,7 @@
   <ul>
   {% for trib in tributaries %}
     <li data-name="{{ trib['name'] }}">
-      {{ trib['name']|opt_link_path(trib['path']) }}
+      {{ trib['name']|opt_link_path(trib['url_path']) }}
       {%- if trib['confluences']|length == 1 %}, which joins it at {{ trib['confluences'][0]|fmt_latlng }} at OSM node {{ trib['confluences'][0]['nid']|fmt_nid }}, and {{ trib['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
       {%- elif trib['confluences']|length > 1 %}
         , which joins it at the following points:
@@ -181,11 +181,11 @@
             at OSM node {{ conf['nid']|fmt_nid }}
           {% endfor %}
       {% endif %}
-    {% if 'path' in trib %}
+    {% if 'url_path' in trib %}
       <div>
       <button 
         class="btn btn-outline-secondary btn-sm"
-        hx-select="#tributaries > *" hx-get="{{url_prefix}}{{trib['path']}}" hx-swap=outerHTML>
+        hx-select="#tributaries > *" hx-get="{{url_prefix}}{{trib['url_path']}}/" hx-swap=outerHTML>
         load it's tributaries</button>
       </div>
     {% endif %}

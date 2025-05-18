@@ -180,6 +180,8 @@ fn index_page(
 
     Ok(())
 }
+
+
 fn name_index_pages(
     args: &Args,
     env: &mut minijinja::Environment,
@@ -406,12 +408,13 @@ fn individual_river_pages(
 
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
-    let stmt = conn1.prepare(
+    let all_rivers_sql = conn1.prepare(
         r#"
 	    select
             ogc_fid,
             tag_group_value as name,
             (tag_group_value IS NULL) as is_unnamed,
+            url_path,
             min_nid, length_m,
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
@@ -426,22 +429,23 @@ fn individual_river_pages(
 
     let river_in_admins_stmt = conn2.prepare(
         r#"select
-        name, iso, url_path
-        from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
-        where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 0
-		order by admins.name
+        a_name as name, a_iso, a_url_path as url_path
+        from ww_a
+        where ww_a.ww_ogc_fid = $1 and a_level = 0
+		order by a_name
     "#,
     )?;
     let river_in_subregions_stmt = conn2.prepare(
         r#"select
-        name, iso, url_path
-        from ww_in_admin_ranks JOIN admins on (a_ogc_fid = admins.ogc_fid)
-        where ww_in_admin_ranks.ww_ogc_fid = $1 and admins.level = 1 and admins.parent_iso = $2
-        order by name
+        a_name as name, a_url_path as url_path
+        from ww_a
+        where ww_a.ww_ogc_fid = $1 and a_level = 1 and a_parent_iso  = $2
+        order by a_name
         "#,
     )?;
 
-    let mut rivers_iter = conn1.query_raw(&stmt, &[] as &[bool; 0])?;
+    let mut rivers_iter = conn1.query_raw(&all_rivers_sql, &[] as &[bool; 0])?; // [bool;0] is just
+                                                                                // a hack
     let rivers_iter = std::iter::from_fn(|| {
         rivers_iter
             .next()
@@ -457,19 +461,11 @@ fn individual_river_pages(
         )
         .unwrap(),
     );
+    bar.set_message("Genering River Pages");
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         if river["name"].is_null() {
             river["name"] = "(unnamed)".into();
-        }
-        river["path"] = path(
-            river["name"].as_str().unwrap(),
-            river["min_nid"].as_u64().unwrap(),
-        )
-        .into();
-        let url = url_prefix.join(river["path"].as_str().unwrap());
-        if river["geom"].is_null() || river["bbox"].is_null() {
-            dbg!(&river);
         }
         parse_inner_json_value(&mut river["geom"])?;
 
@@ -524,25 +520,13 @@ fn individual_river_pages(
                 .for_each(|ww| {
                     ww["name"] = ww["tag_group_value"].clone();
                     if ww["name"].is_null() {
-                        ww["is_unnamed"] = true.into();
                         ww["name"] = "(unnamed)".into();
-                    } else {
-                        ww["is_unnamed"] = false.into();
                     }
-                    ww["path"] = path(
-                        ww["name"].as_str().unwrap(),
-                        ww["min_nid"].as_u64().unwrap(),
-                    )
-                    .into();
+                    ww["url_path"] = format!("{} {:012}", ww["name"].as_str().unwrap(), ww["min_nid"].as_i64().unwrap()).into();
                 });
         }
 
-        assert!(
-            !output_site_db_bulk_adder.url_exists(url.to_str().unwrap())?,
-            "URL {} already exists in the site",
-            url.display()
-        );
-        river["url"] = c14n_url_w_slash(url.display().to_string()).into();
+        river["url"] = c14n_url_w_slash(url_prefix.join(river["url_path"].as_str().unwrap()).to_string_lossy()).into();
 
         let mut admin0s = do_query(
             &mut conn2,
@@ -555,7 +539,7 @@ fn individual_river_pages(
                 &river_in_subregions_stmt,
                 &[
                     &(river["ogc_fid"].as_i64().unwrap() as i32),
-                    &region["iso"].as_str().unwrap(),
+                    &region["a_iso"].as_str().unwrap(),
                 ],
             )?
             .into();
@@ -573,7 +557,7 @@ fn individual_river_pages(
         }
 
         output_site_db_bulk_adder.add_unique_url(
-            c14n_url_w_slash(url.display().to_string()),
+            river["url"].as_str().unwrap(),
             html_zstd_dict_id,
             html_hdr_idx,
             content,
@@ -587,7 +571,7 @@ fn individual_river_pages(
         }
 
         output_site_db_bulk_adder.add_unique_url(
-            url.join("geometry.geojson").to_str().unwrap(),
+            c14n_url_w_slash(url_prefix.join(river["url_path"].as_str().unwrap()).join("geometry.geojson").to_string_lossy()),
             geojson_zstd_dict_id,
             geojson_hdr_idx,
             content,
@@ -714,11 +698,10 @@ fn individual_region_pages(
 
     let rivers_in_admin_sql = conn2.prepare(
         r#"select
-        tag_group_value as name, length_m, min_nid
-        from planet_grouped_waterways JOIN ww_in_admin_ranks ON (planet_grouped_waterways.ogc_fid = ww_in_admin_ranks.ww_ogc_fid)
-            JOIN admins ON (admins.ogc_fid = ww_in_admin_ranks.a_ogc_fid)
-        WHERE admins.ogc_fid = $1
-        AND planet_grouped_waterways.length_m >= 1000
+        ww_tag_group_value as name, ww_length_m as length_m, ww_min_nid as min_nid, ww_url_path as url_path
+        from ww_a
+        WHERE a_ogc_fid = $1
+        AND ww_length_m >= 1000
         ORDER BY ww_rank_in_a ASC
         LIMIT 20000
         "#,
@@ -777,12 +760,8 @@ fn individual_region_pages(
             if river["name"].is_null() {
                 river["name"] = "(unnamed)".into();
             }
-            let path = path(
-                river["name"].as_str().unwrap(),
-                river["min_nid"].as_u64().unwrap(),
-            );
-            let url = url_prefix.join(path.as_str()).display().to_string();
-            river["url_path"] = url.into();
+            let url = url_prefix.join(river["url_path"].as_str().unwrap());
+            river["url_path"] = url.to_string_lossy().into();
         });
 
         set_url_path(&mut admin);

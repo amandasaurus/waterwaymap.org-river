@@ -7,15 +7,15 @@ use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Instant;
 
-pub(crate) fn path(name: &str, min_nid: u64) -> String {
+pub(crate) fn path2(name: &str, min_nid: u64) -> String {
     if name == "(unnamed)" {
         format!("{}-{:012}", name, min_nid)
     } else {
-        format!("{}.{:012}", name_hash(name), min_nid)
+        format!("{}.{:012}", name_hash2(name), min_nid)
     }
 }
 
-pub(crate) fn name_hash(name: &str) -> String {
+pub(crate) fn name_hash2(name: &str) -> String {
     let hash = calculate_hash(&name);
     let name = slugify(name);
     format!("{}-{:03}", name, hash % 1000)
@@ -177,6 +177,12 @@ pub(crate) fn xml_encode(s: String) -> String {
 
     s.replace("\"", "&quot;")
 }
+//
+//pub(crate) opt_compress(
+//        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+//            let new_content = html_zstd_dict_comp.compress(&content)?;
+//            let _ = std::mem::replace(&mut content, new_content);
+//        }
 
 pub struct ElapsedPrinter {
     started: Instant,
