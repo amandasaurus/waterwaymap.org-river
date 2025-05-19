@@ -163,7 +163,9 @@ fn index_page(
             tag_group_value as name, url_path,
             min_nid, length_m,
             stream_level, stream_level_code,
-            coalesce((select json_agg(json_build_object('name', a_name, 'url_path', a_url_path) order by a_name) from ww_a where ww_ogc_fid = ogc_fid and ww_a.a_level = 0), '[]'::json) as countries
+            coalesce(
+                (select json_agg(json_build_object('name', a_name, 'url_path', a_url_path) order by a_name) from ww_a where ww_ogc_fid = ogc_fid and ww_a.a_level = 0),
+                '[]'::json) as countries
         from
             planet_grouped_waterways
         where tag_group_value IS NOT NULL AND length_m > 20000
