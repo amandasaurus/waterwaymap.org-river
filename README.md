@@ -1,4 +1,4 @@
-# `waterwaymap_org_riversite`
+# `waterwaymap.org_river`
 
 The code & templates which powers the [OpenStreetMap River Database on WaterwayMap.org (`waterwaymap.org/river/`)](https://waterwaymap.org/river/)
 
