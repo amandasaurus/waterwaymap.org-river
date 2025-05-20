@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -171,7 +170,6 @@ fn index_page(
         where tag_group_value IS NOT NULL AND length_m > 20000
         order by length_m desc limit 500;", &[])?;
 
-
     let index_page = env
         .get_template("index.j2")?
         .render(context!(stream_level0s => rows))?;
@@ -182,7 +180,6 @@ fn index_page(
 
     Ok(())
 }
-
 
 fn name_index_pages(
     args: &Args,
@@ -286,7 +283,13 @@ fn name_index_pages(
             do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         rivers.par_iter_mut().for_each(|row| {
-            row["url_path"] = c14n_url_w_slash(url_prefix.join(row["url_path"].as_str().unwrap()).to_str().unwrap()).into();
+            row["url_path"] = c14n_url_w_slash(
+                url_prefix
+                    .join(row["url_path"].as_str().unwrap())
+                    .to_str()
+                    .unwrap(),
+            )
+            .into();
         });
 
         urls_for_sitemap.extend(
@@ -523,11 +526,21 @@ fn individual_river_pages(
                     if ww["name"].is_null() {
                         ww["name"] = "(unnamed)".into();
                     }
-                    ww["url_path"] = format!("{} {:012}", ww["name"].as_str().unwrap(), ww["min_nid"].as_i64().unwrap()).into();
+                    ww["url_path"] = format!(
+                        "{} {:012}",
+                        ww["name"].as_str().unwrap(),
+                        ww["min_nid"].as_i64().unwrap()
+                    )
+                    .into();
                 });
         }
 
-        river["url"] = c14n_url_w_slash(url_prefix.join(river["url_path"].as_str().unwrap()).to_string_lossy()).into();
+        river["url"] = c14n_url_w_slash(
+            url_prefix
+                .join(river["url_path"].as_str().unwrap())
+                .to_string_lossy(),
+        )
+        .into();
 
         let mut admin0s = do_query(
             &mut conn2,
@@ -572,7 +585,12 @@ fn individual_river_pages(
         }
 
         output_site_db_bulk_adder.add_unique_url(
-            c14n_url_w_slash(url_prefix.join(river["url_path"].as_str().unwrap()).join("geometry.geojson").to_string_lossy()),
+            c14n_url_w_slash(
+                url_prefix
+                    .join(river["url_path"].as_str().unwrap())
+                    .join("geometry.geojson")
+                    .to_string_lossy(),
+            ),
             geojson_zstd_dict_id,
             geojson_hdr_idx,
             content,

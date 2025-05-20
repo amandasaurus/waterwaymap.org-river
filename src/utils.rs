@@ -1,45 +1,11 @@
 use anyhow::{Context, Result};
+use libsqlitesite::c14n_url_w_slash;
 use log::info;
 use minijinja::State;
 use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
 use serde_json::Value;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Instant;
-use libsqlitesite::c14n_url_w_slash;
-
-pub(crate) fn path2(name: &str, min_nid: u64) -> String {
-    if name == "(unnamed)" {
-        format!("{}-{:012}", name, min_nid)
-    } else {
-        format!("{}.{:012}", name_hash2(name), min_nid)
-    }
-}
-
-pub(crate) fn name_hash2(name: &str) -> String {
-    let hash = calculate_hash(&name);
-    let name = slugify(name);
-    format!("{}-{:03}", name, hash % 1000)
-}
-
-pub(crate) fn slugify(s: &str) -> String {
-    let replace_with_hypen = [' ', '/'];
-    let deletes = ['(', ')', '\'', '\"', '.', '&', '#', '*', ','];
-
-    let mut s = s.to_lowercase();
-    for c in replace_with_hypen {
-        s = s.replace(c, "-");
-    }
-    for c in deletes {
-        s = s.replace(c, "");
-    }
-
-    while s.contains("--") {
-        s = s.replace("--", "-")
-    }
-
-    s
-}
 
 pub(crate) fn fmt_length(l: String) -> String {
     let l: f64 = match l.parse() {
@@ -54,13 +20,6 @@ pub(crate) fn fmt_length(l: String) -> String {
         let l_km_int = (l / 1000.).round() as u64;
         format!("{} km", l_km_int.to_formatted_string(&Locale::en))
     }
-}
-
-/// Simple hash value
-pub(crate) fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
 }
 
 /// Parse this json string into the json object
