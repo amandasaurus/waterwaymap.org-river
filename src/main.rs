@@ -424,7 +424,6 @@ fn individual_river_pages(
             ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
             ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
-            where length_m >= 100000
             ;
 	  "#,
     )?;
