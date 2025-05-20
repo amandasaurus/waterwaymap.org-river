@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Instant;
+use libsqlitesite::c14n_url_w_slash;
 
 pub(crate) fn path2(name: &str, min_nid: u64) -> String {
     if name == "(unnamed)" {
@@ -82,7 +83,7 @@ pub(crate) fn round(f: f64, places: u8) -> f64 {
 pub(crate) fn opt_link_path(state: &State, text: String, path: String) -> String {
     format!(
         r#"<a href="{url_prefix}{path}">{text}</a>"#,
-        url_prefix = state.lookup("url_prefix").unwrap(),
+        url_prefix = c14n_url_w_slash(state.lookup("url_prefix").unwrap().as_str().unwrap()),
         path = path,
         text = text
     )
