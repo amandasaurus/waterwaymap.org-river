@@ -16,7 +16,9 @@
 <div class=rivers>
 <ul>
 	{% for river in rivers %}
-		<li><a href="{{ river['url_path'] }}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+		<li><a href="{{ river['url_path'] }}">{{ river['name'] }}</a>
+		({{ river['length_m']|fmt_length }}})
+		</li>
 	{% endfor %}
 </ul>
 </div>
@@ -36,7 +38,7 @@
 			{%- if subregion["top_rivers"]|length > 0 -%}
 				, including: 
 				{% for river in subregion["top_rivers"] %}
-				{{ loop.first|if_false(", ") }}<a href="/{{ url_prefix }}river/{{ river.url_path }}">{{ river.name }}</a>
+				{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}river/{{ river.url_path }}">{{ river.name }}</a>
 				{% endfor %}
 			{% endif %}
 		</li>
