@@ -18,7 +18,7 @@
   {% if is_in_regions|length == 1 %}
   <p>{{ name|default("It", true) }} is in <a href="{{url_prefix}}region/{{ is_in_regions[0]["url_path"] }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}</p>
   {% elif is_in_regions|length > 1 %}
-  <p>{{ name|defaul("It", true) }} flows through {{ is_in_regions|length }} countries:
+  <p>{{ name|default("It", true) }} flows through {{ is_in_regions|length }} countries:
   <ul>
 	  {% for region in is_in_regions %}
 	  <li>
