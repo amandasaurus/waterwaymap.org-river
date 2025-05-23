@@ -41,6 +41,13 @@
 <body>
   <main class="container">
 
+  {% macro river_link_name(river) -%}
+	<a href="{{ river['url_path']|c14n_url_prefix }}">{{ river['name'] }}</a>
+  {%- endmacro %}
+  {% macro river_link_name_len(river) -%}
+	{{ river_link_name(river) }} ({{ river['length_m']|fmt_length }})
+  {%- endmacro %}
+
   {% block body %}
   {% endblock %}
 

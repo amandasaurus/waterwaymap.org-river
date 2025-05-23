@@ -6,7 +6,9 @@
 
 <ul>
   {% for river in rivers %}
-  <li><a href="{{ river['url_path'] }}">{{ river['name'] }} ({{ river['length_m']|fmt_length }})</a></li>
+  <li>
+  {{ river_link_name_len(river) }}
+  </li>
   {% endfor %}
 
 </ul>

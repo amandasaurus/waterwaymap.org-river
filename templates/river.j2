@@ -116,7 +116,7 @@
     {% endfor %}
   {% endif %}
   {% if terminal_distributaries|length == 1 %}
-	{{ name }} flows into {{ terminal_distributaries[0]['name']|opt_link_path(terminal_distributaries[0]['url_path']) }}
+	{{ name }} flows into {{ river_link_name(terminal_distributaries[0]) }}
     {%- if terminal_distributaries[0]['confluences']|length == 1 %}
       , which it joins at
       {{ terminal_distributaries[0]['confluences'][0]|fmt_latlng }}
@@ -140,7 +140,7 @@
     <ul>
       {% for dist in terminal_distributaries %}
       <li>
-        {{ dist['name']|opt_link_path(dist['url_path']) }}
+		{{ river_link_name(dist) }}
         {%- if dist['confluences']|length == 1 %}
           , which it joins at
           {{ dist['confluences'][0] |fmt_latlng }}
@@ -171,7 +171,7 @@
   <ul>
   {% for trib in tributaries %}
     <li data-name="{{ trib['name'] }}">
-      {{ trib['name']|opt_link_path(trib['url_path']) }}
+      {{ river_link_name(trib) }}
       {%- if trib['confluences']|length == 1 %}, which joins it at {{ trib['confluences'][0]|fmt_latlng }} at OSM node {{ trib['confluences'][0]['nid']|fmt_nid }}, and {{ trib['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
       {%- elif trib['confluences']|length > 1 %}
         , which joins it at the following points:

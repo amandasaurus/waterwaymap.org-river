@@ -11,7 +11,7 @@
 <div class=regions>
 <ul>
 	{% for region in regions %}
-		<li><a href="{{ region['url_path'] }}">{{ region['name'] }}</a>. {{ region["num_rivers"]|fmt_num }} waterway{{ region['num_rivers']|pluralize }}{% if region["num_subregions"] > 0 %}, {{ region["num_subregions"]|fmt_num }} subregion{{ region['num_subregions']|pluralize }}{% endif %}</li>
+		<li><a href="{{ region['url_path'] }}">{{ region['name']|default("an unnamed river") }}</a>. {{ region["num_rivers"]|fmt_num }} waterway{{ region['num_rivers']|pluralize }}{% if region["num_subregions"] > 0 %}, {{ region["num_subregions"]|fmt_num }} subregion{{ region['num_subregions']|pluralize }}{% endif %}</li>
 	{% endfor %}
 </ul>
 </div>
