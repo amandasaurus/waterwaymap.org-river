@@ -282,16 +282,6 @@ fn name_index_pages(
         let mut rivers: Vec<serde_json::Value> =
             do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
-        rivers.par_iter_mut().for_each(|row| {
-            row["url_path"] = c14n_url_w_slash(
-                url_prefix
-                    .join(row["url_path"].as_str().unwrap())
-                    .to_str()
-                    .unwrap(),
-            )
-            .into();
-        });
-
         urls_for_sitemap.extend(
             rivers
                 .iter()
@@ -529,13 +519,6 @@ fn individual_river_pages(
                 });
         }
 
-        river["url"] = c14n_url_w_slash(
-            url_prefix
-                .join(river["url_path"].as_str().unwrap())
-                .to_string_lossy(),
-        )
-        .into();
-
         let mut admin0s = do_query(
             &mut conn2,
             &river_in_admins_stmt,
@@ -768,11 +751,6 @@ fn individual_region_pages(
         drop(rows);
         chunk.par_sort_by_key(|r| {
             OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap())
-        });
-
-        chunk.par_iter_mut().for_each(|river| {
-            let url = url_prefix.join(river["url_path"].as_str().unwrap());
-            river["url_path"] = url.to_string_lossy().into();
         });
 
         set_url_path(&mut admin);
