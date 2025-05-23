@@ -889,6 +889,16 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
             }
         },
     );
+    env.add_filter(
+        "if_none",
+        |var: &minijinja::value::Value, output: String| {
+			if minijinja::tests::is_none(var) {
+                output
+            } else {
+                "".to_string()
+            }
+        },
+    );
 
     Ok(env)
 }
