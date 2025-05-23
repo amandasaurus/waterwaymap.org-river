@@ -721,11 +721,13 @@ fn individual_region_pages(
     )?;
 
     let subregions_sql = conn2
-        .prepare(r"select
-            name, iso, url_path,
-            (select count(*) from ww_a where a_ogc_fid = admins.ogc_fid AND ww_tag_group_value IS NOT NULL and ww_length_m >= 1000) as num_rivers,
-            coalesce((select json_agg(json_build_object('name', ww_tag_group_value, 'url_path', ww_url_path)) from ww_a where a_ogc_fid = admins.ogc_fid and ww_tag_group_value IS NOT NULL AND ww_rank_in_a <= 5), '[]'::json) as top_rivers
-        from admins WHERE parent_iso = $1 order by name")?;
+        .prepare(r"SELECT
+				name, iso, url_path,
+				(select count(*) from ww_a where a_ogc_fid = admins.ogc_fid AND ww_tag_group_value IS NOT NULL and ww_length_m >= 1000) as num_rivers,
+				coalesce((select json_agg(json_build_object('name', ww_tag_group_value, 'url_path', ww_url_path)) from ww_a where a_ogc_fid = admins.ogc_fid and ww_tag_group_value IS NOT NULL AND ww_rank_in_a <= 5), '[]'::json) as top_rivers
+			FROM admins
+			WHERE parent_iso = $1
+			ORDER BY name")?;
 
     let admins = r#"select ogc_fid, url_path, name, iso, parent_iso, level
         from admins
@@ -742,7 +744,6 @@ fn individual_region_pages(
             .and_then(|pgrow| row_to_json(pgrow).ok())
     });
 
-    //let mut rivers_in_admin_iter = rivers_in_admin_iter_raw.chunk_by(|row| row.get("admin_ogc_fid").unwrap().clone());
     let set_url_path = |admin: &mut Value| {
         let mut admin_url = region_url.clone();
         admin_url.push(admin["url_path"].as_str().unwrap());
