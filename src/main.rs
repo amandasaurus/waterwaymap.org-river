@@ -675,7 +675,6 @@ fn individual_region_pages(
         num_regions.to_formatted_string(&Locale::en)
     );
     let region_url = url_prefix.join("region");
-    let mut admin0s = HashMap::with_capacity(200);
 
     let html_hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
@@ -714,10 +713,13 @@ fn individual_region_pages(
 			WHERE parent_iso = $1
 			ORDER BY name")?;
 
-    let admins = r#"select ogc_fid, url_path, name, iso, parent_iso, level
+    let admins = r#"select
+        ogc_fid, url_path, name, iso, parent_iso, level,
+        (select json_build_object('name', name, 'url_path', url_path) from admins as parent_admin where parent_admin.level < admins.level and parent_admin.iso = admins.parent_iso limit 1) as parent_region,
+        (select count(*) from ww_in_admin_ranks where a_ogc_fid = ogc_fid) as num_rivers
         from admins
         WHERE name IS NOT NULL
-        order by level, iso, name
+        order by level, url_path
         "#;
 
     let mut rivers_in_admin = conn1.query_raw(admins, &[] as &[bool; 0])?;
@@ -750,16 +752,14 @@ fn individual_region_pages(
         if chunk.is_empty() {
             continue;
         }
+        chunk.truncate(20000);
         drop(rows);
         chunk.par_sort_by_key(|r| {
             OrderedFloat::from(-r.get("length_m").and_then(|v| v.as_f64()).unwrap())
         });
 
         set_url_path(&mut admin);
-        admin["num_rivers"] = chunk.len().into();
-        admin["num_subregions"] = 0.into();
-        //admin["long_rivers"] = chunk.iter().take(5).collect::<Vec<_>>().into();
-
+        
         let mut subregions = conn2
             .query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?
             .into_iter()
@@ -768,13 +768,6 @@ fn individual_region_pages(
         subregions.par_iter_mut().for_each(set_url_path);
         admin["num_subregions"] = subregions.len().into();
         admin["subregions"] = subregions.into();
-
-        admin["parent_region"] = admin
-            .get("parent_iso")
-            .and_then(Value::as_str)
-            .and_then(|parent_iso| admin0s.get(parent_iso))
-            .cloned()
-            .into();
 
         let mut content = env
             .get_template("admin_region.j2")?
@@ -798,7 +791,7 @@ fn individual_region_pages(
         "select
             name, iso, url_path,
             (select count(*) from ww_in_admin_ranks where a_ogc_fid = ogc_fid) as num_rivers,
-            (select count(*) from admins as subregions where subregions.parent_iso = admins.iso and level = 1) as num_subregions
+            (select count(*) from admins as subregions where subregions.parent_iso = admins.iso and subregions.level = 1) as num_subregions
             from admins where level = 0 order by name;"
         , &[])?;
 
