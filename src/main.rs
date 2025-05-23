@@ -126,7 +126,7 @@ fn row_to_json(row: Row) -> Result<Value> {
             postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
             postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
             postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
-            postgres::types::Type::JSON => json!(row.get::<_, serde_json::Value>(i)),
+            postgres::types::Type::JSON => json!(row.get::<_, Option<serde_json::Value>>(i).map_or(serde_json::Value::Null, |v| v)),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
             _ => unimplemented!("Unknown type {:?}", col.type_()),
