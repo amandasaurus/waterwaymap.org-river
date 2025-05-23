@@ -279,7 +279,7 @@ fn name_index_pages(
         .to_string();
         urls_for_sitemap.push(this_index_page_url.clone());
 
-        let mut rivers: Vec<serde_json::Value> =
+        let rivers: Vec<serde_json::Value> =
             do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         urls_for_sitemap.extend(
