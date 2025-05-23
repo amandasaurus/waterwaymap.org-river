@@ -465,7 +465,7 @@ fn individual_river_pages(
         )
         .unwrap(),
     );
-    bar.set_message("Genering River Pages");
+    bar.set_message("Generating River Pages");
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         if river["name"].is_null() {
