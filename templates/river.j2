@@ -1,6 +1,6 @@
 {% extends "base.j2" %}
-{% block title %}{{ name|xml_encode }}{% endblock %}
-{% block description %}{{name|xml_encode}} is {{length_m|fmt_length}} long, with {{ num_distributaries }} distributaries and {{ num_tributaries }} tributaries, with max. upstream of {{ max_upstream_m|fmt_length }}{% endblock %}
+{% block title %}{{ name|defaut("An unnamed river", true)|xml_encode }}{% endblock %}
+{% block description %}{{name|default("This unnamed river", true)|xml_encode}} is {{length_m|fmt_length}} long, with {{ num_distributaries }} distributaries and {{ num_tributaries }} tributaries, with max. upstream of {{ max_upstream_m|fmt_length }}{% endblock %}
 {% block url_path %}{{ url }}{% endblock %}
 {% block extra_head_content %}
     <script src="{{ url_prefix }}js/river_map.js"></script>
@@ -13,12 +13,12 @@
 {% block body %}
   <h1>{{ name }}</h1>
 
-  <p>Based on OpenStreetMap data, {{name}} is {{length_m|fmt_length}} long.</p>
+  <p>Based on OpenStreetMap data, {{name|default("this unnamed river", true)}} is {{length_m|fmt_length}} long.</p>
 
   {% if is_in_regions|length == 1 %}
-  <p>{{ name }} is in <a href="{{url_prefix}}region/{{ is_in_regions[0]["url_path"] }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}</p>
+  <p>{{ name|default("It", true) }} is in <a href="{{url_prefix}}region/{{ is_in_regions[0]["url_path"] }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}</p>
   {% elif is_in_regions|length > 1 %}
-  <p>{{ name }} flows through {{ is_in_regions|length }} countries:
+  <p>{{ name|defaul("It", true) }} flows through {{ is_in_regions|length }} countries:
   <ul>
 	  {% for region in is_in_regions %}
 	  <li>
@@ -28,7 +28,7 @@
 	</ul>
   {% endif %}
 
-  <h2 id="map">Map of {{name}}</h2>
+  <h2 id="map">Map</h2>
   <div id="map_div" style="width: 100%; height: 500px;"></div>
       <div>
         This area:
@@ -110,13 +110,13 @@
   <div id=distributaries>
   <p>
   {% if distributaries_sea %}
-    {{ name }} flows into the sea:
+    {{ name|defaut("It", true) }} flows into the sea:
     {% for dist in distributaries_sea %}
       {{ dist['upstream_m']|fmt_length }} of total upstream flows in at {{ dist|fmt_latlng }} at OSM node {{ dist['nid']|fmt_nid }}.
     {% endfor %}
   {% endif %}
   {% if terminal_distributaries|length == 1 %}
-	{{ name }} flows into {{ river_link_name(terminal_distributaries[0]) }}
+	{{ name|defaut("It", true) }} flows into {{ river_link_name(terminal_distributaries[0]) }}
     {%- if terminal_distributaries[0]['confluences']|length == 1 %}
       , which it joins at
       {{ terminal_distributaries[0]['confluences'][0]|fmt_latlng }}
