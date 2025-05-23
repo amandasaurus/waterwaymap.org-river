@@ -39,15 +39,6 @@ pub(crate) fn round(f: f64, places: u8) -> f64 {
     (f * places).round() / places
 }
 
-pub(crate) fn opt_link_path(state: &State, text: String, path: String) -> String {
-    format!(
-        r#"<a href="{url_prefix}{path}">{text}</a>"#,
-        url_prefix = c14n_url_w_slash(state.lookup("url_prefix").unwrap().as_str().unwrap()),
-        path = path,
-        text = text
-    )
-}
-
 pub(crate) fn sexagesimal(degrees: f64) -> String {
     let mut deg = degrees.trunc() as i32;
     let min_f = (degrees.abs() - deg.abs() as f64) * 60.0;

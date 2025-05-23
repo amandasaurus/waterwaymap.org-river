@@ -868,7 +868,6 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
             nid = nid
         )
     });
-    env.add_filter("opt_link_path", opt_link_path);
     env.add_filter("c14n_url", |s: String| libsqlitesite::c14n_url_w_slash(s));
     let url_prefix2 = url_prefix.clone();
     env.add_filter("c14n_url_prefix", move |s: String| {
