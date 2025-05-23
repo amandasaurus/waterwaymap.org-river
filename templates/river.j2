@@ -60,7 +60,7 @@
           />
           osm.org <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
         </a>
-		<a href="{{ url }}/geometry.geojson" download="{{ path }}-geometry.geojson">
+		<a href="{{ (url_path + "/geometry.geojson")|c14n_url_prefix }}" download="{{ url_path }}.geojson">
 			Download GeoJSON
 		</a>
         <span id="open_in_josm" x-data="{show_josm_not_running: false}">
@@ -68,7 +68,7 @@
             class="inline_centre"
 			title="Edit in JOSM"
             @click="let map = document.map; let b = map.getBounds();
-			let josm_url = `http://localhost:8111/import?url={{ url }}/geometry.geojson&amp;changeset_source=${encodeURIComponent(location.href)}&amp;changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&amp;url=${encodeURIComponent('{{ url }}')}`;
+			let josm_url = `http://localhost:8111/import?layer_name={{ name }}&upload=never&new_layer=true&changeset_source=${encodeURIComponent(location.href)}&changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&url=${encodeURIComponent(location.href+'geometry.geojson')}`;
 			let res_ok = await fetch(josm_url).then(r => r.ok).catch(e => false);
 			this.disabled = false;
 			if (!res_ok) {
