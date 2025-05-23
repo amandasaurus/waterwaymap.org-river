@@ -455,6 +455,7 @@ fn individual_river_pages(
         )
         .unwrap(),
     );
+
     bar.set_message("Generating River Pages");
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
@@ -547,8 +548,11 @@ fn individual_river_pages(
             let _ = std::mem::replace(&mut content, new_content);
         }
 
+        assert!(!output_site_db_bulk_adder.url_exists(
+            full_url1(url_prefix, river["url_path"].as_str().unwrap())
+        )?, "{:?}", river["url_path"]);
         output_site_db_bulk_adder.add_unique_url(
-            river["url"].as_str().unwrap(),
+            full_url1(url_prefix, river["url_path"].as_str().unwrap()),
             html_zstd_dict_id,
             html_hdr_idx,
             content,
@@ -561,13 +565,11 @@ fn individual_river_pages(
             let _ = std::mem::replace(&mut content, new_content);
         }
 
+        assert!(!output_site_db_bulk_adder.url_exists(
+            full_url2(url_prefix, river["url_path"].as_str().unwrap(), "geometry.geojson")
+        )?);
         output_site_db_bulk_adder.add_unique_url(
-            c14n_url_w_slash(
-                url_prefix
-                    .join(river["url_path"].as_str().unwrap())
-                    .join("geometry.geojson")
-                    .to_string_lossy(),
-            ),
+            full_url2(url_prefix, river["url_path"].as_str().unwrap(), "geometry.geojson"),
             geojson_zstd_dict_id,
             geojson_hdr_idx,
             content,

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
 use libsqlitesite::c14n_url_w_slash;
 use log::info;
 use minijinja::State;
@@ -125,9 +126,24 @@ pub(crate) fn xml_encode(s: String) -> String {
     let s = s.replace("<", "&lt;");
     let s = s.replace(">", "&gt;");
     let s = s.replace("'", "&apos;");
+	let s = s.replace("\"", "&quot;");
 
-    s.replace("\"", "&quot;")
+	s
 }
+
+pub fn full_url1(mut url_prefix: &Path, url_part1: &str) -> String {
+    let url_path = url_prefix;
+    let url_path = url_path.join(url_part1);
+	libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
+}
+
+pub fn full_url2(mut url_prefix: &Path, url_part1: &str, url_part2: &str) -> String {
+    let url_path = url_prefix;
+    let url_path = url_path.join(url_part1);
+    let url_path = url_path.join(url_part2);
+	libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
+}
+
 //
 //pub(crate) opt_compress(
 //        if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
