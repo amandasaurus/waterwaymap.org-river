@@ -11,18 +11,18 @@
 </script>
 {% endblock %}
 {% block body %}
-  <h1>{{ name }}</h1>
+  <h1>{{ name|default("An unnamed river", true) }}</h1>
 
   <p>Based on OpenStreetMap data, {{name|default("this unnamed river", true)}} is {{length_m|fmt_length}} long.</p>
 
   {% if is_in_regions|length == 1 %}
-  <p>{{ name|default("It", true) }} is in <a href="{{url_prefix}}region/{{ is_in_regions[0]["url_path"] }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}</p>
+  <p>{{ name|default("It", true) }} is in <a href="{{ ('region/' + is_in_regions[0]["url_path"])|c14n_url_prefix }}">{{ is_in_regions[0].name }}</a>, flowing through the subregions of {% for subregion in is_in_regions[0]["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ ( 'region/'+subregion.url_path)|c14n_url_prefix }}">{{ subregion.name }}</a>{% endfor %}</p>
   {% elif is_in_regions|length > 1 %}
   <p>{{ name|default("It", true) }} flows through {{ is_in_regions|length }} countries:
   <ul>
 	  {% for region in is_in_regions %}
 	  <li>
-		<a href="{{url_prefix}}region/{{ region["url_path"] }}">{{ region.name }}</a>, flowing through the subregions of {% for subregion in region["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ url_prefix }}region/{{ subregion.url_path }}">{{ subregion.name }}</a>{% endfor %}
+		<a href="{{ ('region/'+ region.url_path)|c14n_url_prefix }}">{{ region.name }}</a>, flowing through the subregions of {% for subregion in region["subregions"] %}{{ loop.first|if_false(", ") }}<a href="{{ ('region/'+subregion.url_path)|c14n_url_prefix }}">{{ subregion.name }}</a>{% endfor %}
 	  </li>
       {% endfor %}
 	</ul>
@@ -132,11 +132,11 @@
     {% endif %}
     {% if 'url_path' in terminal_distributaries[0] %}
       <button class="btn btn-outline-secondary btn-sm"
-        hx-select="#distributaries > *" hx-get="{{url_prefix}}{{terminal_distributaries[0]['url_path']}}/"
+        hx-select="#distributaries > *" hx-get="{{ terminal_distributaries[0]['url_path']|c14n_url_prefix }}/"
         hx-swap=outerHTML>load it's distributaries</button>
     {% endif %}
   {% elif terminal_distributaries|length > 1 %}
-	{{ name }} has {{ terminal_distributaries|length }} distributaries.
+	{{ name|default("It", true) }} has {{ terminal_distributaries|length }} distributaries.
     <ul>
       {% for dist in terminal_distributaries %}
       <li>
@@ -155,7 +155,7 @@
           {% endfor %}
         {% endif %}
         {% if 'url_path' in dist %}
-          <button class="btn btn-outline-secondary btn-sm" hx-select="#distributaries > *" hx-get="{{url_prefix}}{{dist['url_path']}}/" hx-swap=outerHTML >load it's distributaries</button>
+          <button class="btn btn-outline-secondary btn-sm" hx-select="#distributaries > *" hx-get="{{ dist['url_path']|c14n_url_prefix }}/" hx-swap=outerHTML >load it's distributaries</button>
         {% endif %}
       </li>
     {% endfor %}
@@ -167,7 +167,7 @@
 
   <h2>Tributaries</h2>
   <div id=tributaries>
-  <p>{{ name }} has {{ tributaries|length }} tributaries.</p>
+  <p>{{ name|default("It", true) }} has {{ tributaries|length }} tributaries.</p>
   <ul>
   {% for trib in tributaries %}
     <li data-name="{{ trib['name'] }}">
@@ -185,7 +185,7 @@
       <div>
       <button 
         class="btn btn-outline-secondary btn-sm"
-        hx-select="#tributaries > *" hx-get="{{url_prefix}}{{trib['url_path']}}/" hx-swap=outerHTML>
+        hx-select="#tributaries > *" hx-get="{{ trib['url_path']|c14n_url_prefix }}/" hx-swap=outerHTML>
         load it's tributaries</button>
       </div>
     {% endif %}
