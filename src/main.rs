@@ -695,6 +695,31 @@ fn individual_region_pages(
         .map(|x| Compressor::with_dictionary(3, &x.1))
         .transpose()?;
 
+    let admin0s: Vec<serde_json::Value> = do_query(&mut conn2,
+        "select
+            name, iso, url_path,
+            (select count(*) from ww_in_admin_ranks where a_ogc_fid = ogc_fid) as num_rivers,
+            (select count(*) from admins as subregions where subregions.parent_iso = admins.iso and subregions.level = 1) as num_subregions
+            from admins where level = 0 order by name;"
+        , &[])?;
+
+    let mut content = env
+        .get_template("admin_region_index.j2")?
+        .render(context!(regions => admin0s))?
+        .into_bytes();
+
+    if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
+        let new_content = html_zstd_dict_comp.compress(&content)?;
+        let _ = std::mem::replace(&mut content, new_content);
+    }
+
+    output_site_db.set_url(
+        c14n_url_w_slash(region_url.to_str().unwrap()),
+        html_zstd_dict_id,
+        html_hdr_idx,
+        content,
+    )?;
+
     let bar = ProgressBar::new(num_regions as u64);
     bar.set_style(
         ProgressStyle::with_template(
@@ -797,30 +822,6 @@ fn individual_region_pages(
         )?;
     }
 
-    let admin0s: Vec<serde_json::Value> = do_query(&mut conn2,
-        "select
-            name, iso, url_path,
-            (select count(*) from ww_in_admin_ranks where a_ogc_fid = ogc_fid) as num_rivers,
-            (select count(*) from admins as subregions where subregions.parent_iso = admins.iso and subregions.level = 1) as num_subregions
-            from admins where level = 0 order by name;"
-        , &[])?;
-
-    let mut content = env
-        .get_template("admin_region_index.j2")?
-        .render(context!(regions => admin0s))?
-        .into_bytes();
-
-    if let Some(ref mut html_zstd_dict_comp) = html_zstd_dict_comp {
-        let new_content = html_zstd_dict_comp.compress(&content)?;
-        let _ = std::mem::replace(&mut content, new_content);
-    }
-
-    output_site_db.set_url(
-        c14n_url_w_slash(region_url.to_str().unwrap()),
-        html_zstd_dict_id,
-        html_hdr_idx,
-        content,
-    )?;
 
     Ok(())
 }
