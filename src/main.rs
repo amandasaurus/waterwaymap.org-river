@@ -126,7 +126,9 @@ fn row_to_json(row: Row) -> Result<Value> {
             postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
             postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
             postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
-            postgres::types::Type::JSON => json!(row.get::<_, Option<serde_json::Value>>(i).map_or(serde_json::Value::Null, |v| v)),
+            postgres::types::Type::JSON => json!(row
+                .get::<_, Option<serde_json::Value>>(i)
+                .map_or(serde_json::Value::Null, |v| v)),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
             _ => unimplemented!("Unknown type {:?}", col.type_()),
@@ -279,8 +281,7 @@ fn name_index_pages(
         .to_string();
         urls_for_sitemap.push(this_index_page_url.clone());
 
-        let rivers: Vec<serde_json::Value> =
-            do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
+        let rivers: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
         urls_for_sitemap.extend(
             rivers
@@ -548,9 +549,12 @@ fn individual_river_pages(
             let _ = std::mem::replace(&mut content, new_content);
         }
 
-        assert!(!output_site_db_bulk_adder.url_exists(
-            full_url1(url_prefix, river["url_path"].as_str().unwrap())
-        )?, "{:?}", river["url_path"]);
+        assert!(
+            !output_site_db_bulk_adder
+                .url_exists(full_url1(url_prefix, river["url_path"].as_str().unwrap()))?,
+            "{:?}",
+            river["url_path"]
+        );
         output_site_db_bulk_adder.add_unique_url(
             full_url1(url_prefix, river["url_path"].as_str().unwrap()),
             html_zstd_dict_id,
@@ -565,11 +569,17 @@ fn individual_river_pages(
             let _ = std::mem::replace(&mut content, new_content);
         }
 
-        assert!(!output_site_db_bulk_adder.url_exists(
-            full_url2(url_prefix, river["url_path"].as_str().unwrap(), "geometry.geojson")
-        )?);
+        assert!(!output_site_db_bulk_adder.url_exists(full_url2(
+            url_prefix,
+            river["url_path"].as_str().unwrap(),
+            "geometry.geojson"
+        ))?);
         output_site_db_bulk_adder.add_unique_url(
-            full_url2(url_prefix, river["url_path"].as_str().unwrap(), "geometry.geojson"),
+            full_url2(
+                url_prefix,
+                river["url_path"].as_str().unwrap(),
+                "geometry.geojson",
+            ),
             geojson_zstd_dict_id,
             geojson_hdr_idx,
             content,
@@ -759,7 +769,7 @@ fn individual_region_pages(
         });
 
         set_url_path(&mut admin);
-        
+
         let mut subregions = conn2
             .query(&subregions_sql, &[&admin["iso"].as_str().unwrap()])?
             .into_iter()
@@ -862,7 +872,7 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
     env.add_filter(
         "if_none",
         |var: &minijinja::value::Value, output: String| {
-			if minijinja::tests::is_none(var) {
+            if minijinja::tests::is_none(var) {
                 output
             } else {
                 "".to_string()

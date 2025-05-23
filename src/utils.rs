@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use std::path::Path;
 use log::info;
 use num_format::{Locale, ToFormattedString};
 use serde::Deserialize;
 use serde_json::Value;
+use std::path::Path;
 use std::time::Instant;
 
 pub(crate) fn fmt_length(l: String) -> String {
@@ -124,22 +124,22 @@ pub(crate) fn xml_encode(s: String) -> String {
     let s = s.replace("<", "&lt;");
     let s = s.replace(">", "&gt;");
     let s = s.replace("'", "&apos;");
-	let s = s.replace("\"", "&quot;");
+    let s = s.replace("\"", "&quot;");
 
-	s
+    s
 }
 
 pub fn full_url1(url_prefix: &Path, url_part1: &str) -> String {
     let url_path = url_prefix;
     let url_path = url_path.join(url_part1);
-	libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
+    libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
 }
 
 pub fn full_url2(url_prefix: &Path, url_part1: &str, url_part2: &str) -> String {
     let url_path = url_prefix;
     let url_path = url_path.join(url_part1);
     let url_path = url_path.join(url_part2);
-	libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
+    libsqlitesite::c14n_url_w_slash(url_path.to_str().unwrap()).into_owned()
 }
 
 //
