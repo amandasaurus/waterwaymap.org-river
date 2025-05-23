@@ -468,9 +468,6 @@ fn individual_river_pages(
     bar.set_message("Generating River Pages");
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
-        if river["name"].is_null() {
-            river["name"] = "(unnamed)".into();
-        }
         parse_inner_json_value(&mut river["geom"])?;
 
         river["num_tributaries"] = river["tributaries"].as_array().unwrap().len().into();
@@ -523,12 +520,9 @@ fn individual_river_pages(
                 .par_iter_mut()
                 .for_each(|ww| {
                     ww["name"] = ww["tag_group_value"].clone();
-                    if ww["name"].is_null() {
-                        ww["name"] = "(unnamed)".into();
-                    }
                     ww["url_path"] = format!(
                         "{} {:012}",
-                        ww["name"].as_str().unwrap(),
+                        ww["name"].as_str().unwrap_or("unnamed"),
                         ww["min_nid"].as_i64().unwrap()
                     )
                     .into();
@@ -776,9 +770,6 @@ fn individual_region_pages(
         });
 
         chunk.par_iter_mut().for_each(|river| {
-            if river["name"].is_null() {
-                river["name"] = "(unnamed)".into();
-            }
             let url = url_prefix.join(river["url_path"].as_str().unwrap());
             river["url_path"] = url.to_string_lossy().into();
         });
