@@ -185,6 +185,13 @@ fn base_pages(
             .render(context!())?
     )?;
 
+    output_site_db.set_c14n_url(
+        url_prefix.join("search").to_str().unwrap(),
+        None,
+        hdr_idx,
+        env.get_template("search.j2")?.render(context!())?,
+    )?;
+
     Ok(())
 }
 
