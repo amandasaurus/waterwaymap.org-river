@@ -79,7 +79,7 @@ fn main() -> Result<()> {
         &zstd_dictionaries,
     )?;
 
-    index_page(
+    base_pages(
         &args,
         &mut env,
         &mut output_site_db,
@@ -150,7 +150,7 @@ fn do_query(
         .collect::<Result<Vec<serde_json::Value>>>()
 }
 
-fn index_page(
+fn base_pages(
     args: &Args,
     env: &mut minijinja::Environment,
     output_site_db: &mut SqliteSite,
