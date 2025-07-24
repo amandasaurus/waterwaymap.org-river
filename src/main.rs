@@ -180,10 +180,10 @@ fn base_pages(
     )?;
     output_site_db.set_url(url_prefix.to_str().unwrap(), None, hdr_idx, &index_page)?;
 
-    let page404 = env
-        .get_template("404.j2")?
-        .render(context!())?;
-    output_site_db.set_contents_for_404(page404)?;
+    output_site_db.set_contents_for_404(
+        env.get_template("404.j2")?
+            .render(context!())?
+    )?;
 
     Ok(())
 }
