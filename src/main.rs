@@ -49,6 +49,10 @@ struct Args {
     /// Everything is hosted under this URL
     #[arg(long = "prefix", value_name = "/URL/PREFIX")]
     url_prefix: PathBuf,
+
+    /// An extra variable for templates name=value
+    #[arg(short, long="extra-var", value_name = "name=value")]
+    extra_vars: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -838,12 +842,17 @@ fn individual_region_pages(
     Ok(())
 }
 
-fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
+fn setup_jinja_env<'b>(args: &'b Args) -> Result<minijinja::Environment<'b>> {
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader(&args.template_dir));
 
     let url_prefix: String = args.url_prefix.to_str().map(String::from).unwrap();
     env.add_global("url_prefix", url_prefix.clone());
+
+    for kv in args.extra_vars.iter() {
+        let mut kv_parts = kv.splitn(2, "=");
+        env.add_global(kv_parts.next().unwrap(), kv_parts.next().unwrap());
+    }
 
 
     // Custom filters
