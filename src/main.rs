@@ -845,6 +845,8 @@ fn setup_jinja_env<'b>(args: &Args) -> Result<minijinja::Environment<'b>> {
     let url_prefix: String = args.url_prefix.to_str().map(String::from).unwrap();
     env.add_global("url_prefix", url_prefix.clone());
 
+
+    // Custom filters
     env.add_filter("fmt_length", fmt_length);
     env.add_filter("fmt_latlng", fmt_latlng);
     env.add_filter("fmt_nid", |nid: String| {
