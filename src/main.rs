@@ -51,7 +51,7 @@ struct Args {
     url_prefix: PathBuf,
 
     /// An extra variable for templates name=value
-    #[arg(short, long="extra-var", value_name = "name=value")]
+    #[arg(short, long = "extra-var", value_name = "name=value")]
     extra_vars: Vec<String>,
 }
 
@@ -184,10 +184,7 @@ fn base_pages(
     )?;
     output_site_db.set_url(url_prefix.to_str().unwrap(), None, hdr_idx, &index_page)?;
 
-    output_site_db.set_contents_for_404(
-        env.get_template("404.j2")?
-            .render(context!())?
-    )?;
+    output_site_db.set_contents_for_404(env.get_template("404.j2")?.render(context!())?)?;
 
     output_site_db.set_c14n_url(
         url_prefix.join("search").to_str().unwrap(),
@@ -838,7 +835,6 @@ fn individual_region_pages(
         )?;
     }
 
-
     Ok(())
 }
 
@@ -853,7 +849,6 @@ fn setup_jinja_env<'b>(args: &'b Args) -> Result<minijinja::Environment<'b>> {
         let mut kv_parts = kv.splitn(2, "=");
         env.add_global(kv_parts.next().unwrap(), kv_parts.next().unwrap());
     }
-
 
     // Custom filters
     env.add_filter("fmt_length", fmt_length);
