@@ -33,6 +33,7 @@ const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
 ];
 
 #[derive(Parser, Debug)]
+#[command(version, about)]
 struct Args {
     /// All the static files to add
     #[arg(long = "static", value_name = "STATIC_DIR/")]
