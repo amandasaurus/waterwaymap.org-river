@@ -1,16 +1,16 @@
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use libsqlitesite::c14n_url_w_slash;
 use libsqlitesite::SqliteSite;
+use libsqlitesite::c14n_url_w_slash;
 use log::{info, warn};
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use num_format::{Locale, ToFormattedString};
 use ordered_float::OrderedFloat;
 use postgres::fallible_iterator::FallibleIterator;
-use postgres::{row::Row, Client, NoTls};
+use postgres::{Client, NoTls, row::Row};
 use rayon::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -131,9 +131,10 @@ fn row_to_json(row: Row) -> Result<Value> {
             postgres::types::Type::FLOAT8 => json!(row.get::<_, f64>(i)),
             postgres::types::Type::INT4 => json!(row.get::<_, i32>(i)),
             postgres::types::Type::INT8 => json!(row.get::<_, i64>(i)),
-            postgres::types::Type::JSON => json!(row
-                .get::<_, Option<serde_json::Value>>(i)
-                .map_or(serde_json::Value::Null, |v| v)),
+            postgres::types::Type::JSON => json!(
+                row.get::<_, Option<serde_json::Value>>(i)
+                    .map_or(serde_json::Value::Null, |v| v)
+            ),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
             _ => unimplemented!("Unknown type {:?}", col.type_()),
@@ -454,7 +455,7 @@ fn individual_river_pages(
     )?;
 
     let mut rivers_iter = conn1.query_raw(&all_rivers_sql, &[] as &[bool; 0])?; // [bool;0] is just
-                                                                                // a hack
+    // a hack
     let rivers_iter = std::iter::from_fn(|| {
         rivers_iter
             .next()
@@ -872,21 +873,13 @@ fn setup_jinja_env<'b>(args: &'b Args) -> Result<minijinja::Environment<'b>> {
     env.add_filter(
         "if_true",
         |test: bool, output: String| {
-            if test {
-                output
-            } else {
-                "".to_string()
-            }
+            if test { output } else { "".to_string() }
         },
     );
     env.add_filter(
         "if_false",
         |test: bool, output: String| {
-            if !test {
-                output
-            } else {
-                "".to_string()
-            }
+            if !test { output } else { "".to_string() }
         },
     );
     env.add_filter(
