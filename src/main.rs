@@ -54,6 +54,12 @@ struct Args {
     /// An extra variable for templates name=value
     #[arg(short, long = "extra-var", value_name = "name=value")]
     extra_vars: Vec<String>,
+
+    /// Name of the PG database to connect to
+    /// When not set, a PG connection is made without specifying a db, which means PG will use the
+    /// same as your username.
+    #[arg(short, long, value_name = "DATABASE")]
+    dbname: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -163,7 +169,7 @@ fn base_pages(
     global_http_response_headers: &[(&str, &str)],
     _zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let mut conn = connect_to_db()?;
+    let mut conn = connect_to_db(&args.dbname)?;
     let url_prefix = &args.url_prefix;
     let rows: Vec<serde_json::Value> = do_query(&mut conn,
         "select
@@ -207,7 +213,7 @@ fn name_index_pages(
 ) -> Result<()> {
     let _name_index_pages = ElapsedPrinter::start("generating name_index_pages");
 
-    let mut conn = connect_to_db()?;
+    let mut conn = connect_to_db(&args.dbname)?;
     let url_prefix = &args.url_prefix;
     let index_max = 1000;
     let total_names: i64 = conn.query_one(r#"select count(distinct tag_group_value) as total from planet_grouped_waterways where tag_group_value IS NOT NULL;"#, &[])?.get(0);
@@ -382,8 +388,8 @@ fn individual_river_pages(
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
     let _elapsed = ElapsedPrinter::start("all individual_river_pages");
-    let mut conn1 = connect_to_db()?;
-    let mut conn2 = connect_to_db()?;
+    let mut conn1 = connect_to_db(&args.dbname)?;
+    let mut conn2 = connect_to_db(&args.dbname)?;
     let url_prefix = &args.url_prefix;
     let total_rivers: u64 = conn1
         .query_one(
@@ -689,8 +695,8 @@ fn individual_region_pages(
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let mut conn1 = connect_to_db()?;
-    let mut conn2 = connect_to_db()?;
+    let mut conn1 = connect_to_db(&args.dbname)?;
+    let mut conn2 = connect_to_db(&args.dbname)?;
     let url_prefix = &args.url_prefix;
     let num_regions: i64 = conn1
         .query_one(r#"select count(*) as admin from admins;"#, &[])?
@@ -942,9 +948,15 @@ fn get_or_create_zstd_dictionaries(
     }
 }
 
-fn connect_to_db() -> Result<Client> {
+fn connect_to_db(dbname: &Option<String>) -> Result<Client> {
+    let dbpart = dbname
+        .as_ref()
+        .map_or("".to_string(), |dbname| format!(" dbname=\"{}\" ", dbname));
     Ok(Client::connect(
-        "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"",
+        &format!(
+            "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"{}",
+            &dbpart
+        ),
         NoTls,
     )?)
 }
