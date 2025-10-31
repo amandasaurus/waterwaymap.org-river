@@ -1307,7 +1307,6 @@ dependencies = [
  "ordered-float",
  "postgres",
  "rayon",
- "rusqlite",
  "serde",
  "serde_json",
  "walkdir",
