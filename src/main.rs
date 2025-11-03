@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use libsqlitesite::SqliteSite;
@@ -12,6 +12,7 @@ use postgres::{Client, NoTls, row::Row};
 use rayon::prelude::*;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -60,6 +61,9 @@ struct Args {
     /// same as your username.
     #[arg(short, long, value_name = "DATABASE")]
     dbname: Option<String>,
+
+    #[arg(long)]
+    overwrite: bool,
 }
 
 fn main() -> Result<()> {
@@ -77,7 +81,22 @@ fn main() -> Result<()> {
 
     let mut env = setup_jinja_env(&args)?;
 
+    if args.overwrite && fs::exists(&args.output_site_db)? {
+        anyhow::ensure!(
+            fs::metadata(&args.output_site_db)?.len() <= 200_000_000,
+            "Output file {} is > 200 MB. Not removing it",
+            &args.output_site_db.display()
+        );
+        info!(
+            "Removing small output file {}",
+            args.output_site_db.display()
+        );
+        fs::remove_file(&args.output_site_db)?;
+    }
     let mut output_site_db = SqliteSite::create(&args.output_site_db)?;
+
+    // Test connection to database
+    connect_to_db(&args.dbname).context("Cannot connect to database")?;
 
     let mut zstd_dictionaries = HashMap::new();
     get_or_create_zstd_dictionaries(&mut zstd_dictionaries, &mut output_site_db);
