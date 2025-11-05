@@ -14,7 +14,7 @@ clap = { version = "4.5.30", features = ["derive"] }
 minijinja = { version = "2.7.0", features = ["loader"] }
 rayon = "1.10.0"
 
-libsqlitesite = { path = "/home/amanda/personal/sqlitesite/libsqlitesite/" }
+libsqlitesite = "0.2.0"
 serde = "1.0.217"
 serde_json = "1.0.138"
 crossbeam = "0.8.4"

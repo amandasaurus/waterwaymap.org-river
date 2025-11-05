@@ -567,6 +567,8 @@ dependencies = [
 [[package]]
 name = "libsqlitesite"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b8f45004d1598c24db8d8ca1b6f0801e7db2433b3b6bc51eb5a61a1d0c9e229"
 dependencies = [
  "anyhow",
  "glob",
