@@ -2,7 +2,6 @@
 <html>
 	<head><title>{% block title %}{% endblock %}</title>
 		<link rel="icon" href="data:," />
-		<link rel="canonical" href="https://waterwaymap.org{% block url_path %}{% endblock %}" />
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="description" content="{% block description %}{% endblock %}">
@@ -21,8 +20,6 @@
 		<script defer src="{{ url_prefix }}js/lib/alpine-3.12.3.js"></script>
 		<script src="{{ url_prefix }}js/lib/bootstrap-5.3.3.bundle.min.js" async></script>
 
-		<!-- Facebook Meta Tags -->
-		<meta property="og:url" content="https://waterwaymap.org{{ self.url_path() }}" />
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="{{ self.title() }}" />
 		<meta
