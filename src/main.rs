@@ -107,7 +107,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    )?;
+    ).context("Adding Static pages")?;
 
     base_pages(
         &args,
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    )?;
+    ).context("Creating Base Pages")?;
 
     name_index_pages(
         &args,
@@ -123,7 +123,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    )?;
+    ).context("Creating name_index_pages")?;
 
     individual_river_pages(
         &args,
@@ -131,7 +131,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    )?;
+    ).context("Creating individual_river_pages")?;
 
     individual_region_pages(
         &args,
@@ -139,7 +139,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    )?;
+    ).context("Creating individual_region_pages")?;
 
     Ok(())
 }
@@ -188,7 +188,7 @@ fn base_pages(
     global_http_response_headers: &[(&str, &str)],
     _zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
 ) -> Result<()> {
-    let mut conn = connect_to_db(&args.dbname)?;
+    let mut conn = connect_to_db(&args.dbname).context("Initial DB connection")?;
     let url_prefix = &args.url_prefix;
     let rows: Vec<serde_json::Value> = do_query(&mut conn,
         "select
@@ -201,7 +201,7 @@ fn base_pages(
         from
             planet_grouped_waterways
         where tag_group_value IS NOT NULL AND length_m > 20000
-        order by length_m desc limit 500;", &[])?;
+        order by length_m desc limit 500;", &[]).context("query for top N rivers")?;
 
     let index_page = env
         .get_template("index.j2")?
