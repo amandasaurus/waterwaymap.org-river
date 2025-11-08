@@ -2,7 +2,7 @@ function set_up_map(geojson, bbox) {
 
   let map = new maplibregl.Map({
     container: "map_div",
-    //attributionControl: false,  // manually added later (w. date)
+    attributionControl: false,  // manually added later (w. date)
     style: {
       version: 8,
       sources: {
@@ -63,7 +63,7 @@ function set_up_map(geojson, bbox) {
     }),
   );
   map.addControl(new maplibregl.NavigationControl());
-  //map.addControl(new maplibregl.AttributionControl({customAttribution: "Data as of "+tilesets.data_timestamp}));
+  map.addControl(new maplibregl.AttributionControl({ compact: false }));
 
   map.setPadding({ top: 57 });
   map.fitBounds(bbox);
