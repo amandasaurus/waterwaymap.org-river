@@ -1,5 +1,8 @@
 {% extends "base.j2" %}
-{% block title %}{{ name|default("An unnamed river", true)|xml_encode }}{% endblock %}
+{% block title -%}
+{{ name|default("An unnamed river", true)|xml_encode }} | {{length_m|fmt_length }}, {% for r in is_in_regions %}{{ loop.first|if_false(", ") }}{{ r['name'] }}{% endfor %}
+{%- endblock %}
+
 {% block description %}{{name|default("This unnamed river", true)|xml_encode}} is {{length_m|fmt_length}} long, with {{ num_distributaries }} distributaries and {{ num_tributaries }} tributaries, with max. upstream of {{ max_upstream_m|fmt_length }}{% endblock %}
 {% block url_path %}{{ url }}{% endblock %}
 {% block extra_head_content %}
