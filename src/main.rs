@@ -205,7 +205,10 @@ fn base_pages(
 
     let index_page = env
         .get_template("index.j2")?
-        .render(context!(stream_level0s => rows))?;
+        .render(context!(
+            stream_level0s => rows,
+            riversystems => &[] as &[serde_json::Value],
+        ))?;
     let hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
     )?;
