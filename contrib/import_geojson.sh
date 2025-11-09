@@ -16,4 +16,26 @@ ogr2ogr -f PostgreSQL PG: "$1" -nlt MULTILINESTRING -unsetFid -oo ARRAY_AS_STRIN
 psql -Xe -c 'create index name on planet_grouped_waterways (tag_group_value);'
 psql -Xe -c 'create index length on planet_grouped_waterways (length_m);'
 
+psql -Xe -c "drop table if exists planet_longest_source_mouth_parts cascade;"
+ogr2ogr -f PostgreSQL PG: "$2" -nlt MULTILINESTRING -unsetFid -oo ARRAY_AS_STRING=YES -t_srs EPSG:4326 -lco GEOMETRY_NAME=geom -lco SCHEMA=public -nln planet_longest_source_mouth_parts
+
+
+psql -Xe -c "create table planet_longest_source_mouth as select
+	river_system_mouth_source_nids_s as mouth_source_nids_s,
+	any_value(river_system_internal_groupids) as internal_groupids,
+	 any_value(river_system_length_m) as length_m,
+	 any_value(river_system_source_nid) as source_nid,
+	 any_value(river_system_mouth_nid) as mouth_nid,
+	 any_value(river_system_mouth_source_nids) as mouth_source_nids,
+	 any_value(river_system_names) as names,
+	 any_value(river_system_names_s) as names_s
+	 from planet_longest_source_mouth_parts
+	group by river_system_mouth_source_nids_s ;"
+psql -Xe -c "alter table planet_longest_source_mouth add primary key (mouth_source_nids_s)"
+
+for C in river_system_internal_groupids river_system_length_m river_system_source_nid river_system_mouth_nid river_system_mouth_source_nids river_system_names river_system_names_s ; do
+	psql -c "alter table planet_longest_source_mouth_parts drop column ${C};"
+done
+psql -Xe -c "alter table planet_longest_source_mouth_parts add foreign key (river_system_mouth_source_nids_s) references planet_longest_source_mouth (mouth_source_nids_s);"
+
 psql -X -f ~/osm/waterwaymap.org/riversite_input_data_setup.sql
