@@ -11,7 +11,7 @@
   <p>All named rivers are listed in the <a href="{{url_prefix}}name-index/">Name Index</a></p>
   <p>Explore the <a href="{{url_prefix}}region/">rivers country-by country</a>. <i>The boundaries are taken from <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/">Natural Earth</a> dataset.</i></p>
 
-<details open>
+<details closed>
   <summary>Top 500 rivers that flow into the sea:</summary>
   <ul>
 {%- for river in stream_level0s %}
@@ -26,10 +26,22 @@
 
 <details open>
   <summary>All River systems longer than 1,000 km</summary>
-  <ul>
-{%- for riversystem in riversystems %}
-{%- endfor %}
+  <table>
+	<tr>
+		<th>Length</th>
+		<th>Name</th>
+	</tr>
+	{%- for river_system in river_systems %}
+	<tr>
+      <td>
+		  {{ river_system['length_m']|fmt_length }}
+	  </td>
+      <td>
+		  {{ river_system['names_s'] }}
+	  </td>
+	</tr>
+	{%- endfor %}
   </ul>
-</details
+  </table>
 
 {% endblock %}
