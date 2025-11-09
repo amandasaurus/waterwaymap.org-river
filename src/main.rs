@@ -190,7 +190,7 @@ fn base_pages(
 ) -> Result<()> {
     let mut conn = connect_to_db(&args.dbname).context("Initial DB connection")?;
     let url_prefix = &args.url_prefix;
-    let rows: Vec<serde_json::Value> = do_query(&mut conn,
+    let river_rows: Vec<serde_json::Value> = do_query(&mut conn,
         "select
             tag_group_value as name, url_path,
             min_nid, length_m,
@@ -203,11 +203,21 @@ fn base_pages(
         where tag_group_value IS NOT NULL AND length_m > 20000
         order by length_m desc limit 500;", &[]).context("query for top N rivers")?;
 
+    let river_system_rows: Vec<serde_json::Value> = do_query(&mut conn,
+        "select
+            names_s,
+            length_m,
+            mouth_source_nids_s
+            FROM planet_longest_source_mouth
+            ORDER BY length_m desc
+        ;", &[]).context("query for top N river systems")?;
+    //dbg!(&river_system_rows);
+
     let index_page = env
         .get_template("index.j2")?
         .render(context!(
-            stream_level0s => rows,
-            riversystems => &[] as &[serde_json::Value],
+            stream_level0s => river_rows,
+            river_systems => river_system_rows,
         ))?;
     let hdr_idx = output_site_db.get_or_create_http_response_headers_id(
         http_headers_for_fileext("html", global_http_response_headers),
