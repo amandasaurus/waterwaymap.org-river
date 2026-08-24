@@ -107,7 +107,8 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    ).context("Adding Static pages")?;
+    )
+    .context("Adding Static pages")?;
 
     base_pages(
         &args,
@@ -115,7 +116,8 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    ).context("Creating Base Pages")?;
+    )
+    .context("Creating Base Pages")?;
 
     name_index_pages(
         &args,
@@ -123,7 +125,8 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    ).context("Creating name_index_pages")?;
+    )
+    .context("Creating name_index_pages")?;
 
     individual_river_pages(
         &args,
@@ -131,7 +134,8 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    ).context("Creating individual_river_pages")?;
+    )
+    .context("Creating individual_river_pages")?;
 
     individual_region_pages(
         &args,
@@ -139,7 +143,8 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
-    ).context("Creating individual_region_pages")?;
+    )
+    .context("Creating individual_region_pages")?;
 
     Ok(())
 }
