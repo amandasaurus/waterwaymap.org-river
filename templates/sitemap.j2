@@ -3,6 +3,6 @@
     xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
     xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 {%- for url_path in url_paths %}
-	<url><loc>https://waterwaymap.org{{ url_path|xml_encode }}</loc></url>
+	<url><loc>https://waterwaymap.org/{{ url_path|xml_encode }}</loc></url>
 {%- endfor %}
 </urlset>

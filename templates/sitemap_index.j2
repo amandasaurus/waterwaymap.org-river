@@ -4,6 +4,6 @@
     xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	<sitemap><loc>https://waterwaymap.org/sitemap_base.xml</loc></sitemap>
 {%- for url_path in url_paths %}
-	<sitemap><loc>https://waterwaymap.org{{ url_path|xml_encode }}</loc></sitemap>
+	<sitemap><loc>https://waterwaymap.org/{{ url_path|xml_encode }}</loc></sitemap>
 {%- endfor %}
 </sitemapindex>
