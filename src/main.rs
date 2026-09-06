@@ -331,7 +331,7 @@ fn name_index_pages(
         urls_for_sitemap.extend(
             rivers
                 .iter()
-                .map(|r| r["url_path"].as_str().unwrap().to_owned()),
+                .map(|r| url_prefix.join(r["url_path"].as_str().unwrap()).display().to_string()),
         );
 
         let data = serde_json::json!({
