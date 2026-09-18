@@ -73,10 +73,12 @@ fn main() -> Result<()> {
         .init();
 
     let args = Args::parse();
+    let last_modified_value = chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
 
     let global_http_response_headers = vec![
         ("X-Clacks-Overhead", "GNU Terry Pratchett"),
         ("Cache-Control", "max-age=3600; public"),
+        ("Last-Modified", &last_modified_value),
     ];
 
     let mut env = setup_jinja_env(&args)?;
