@@ -1,5 +1,10 @@
 #!/bin/bash
 set -o errexit -o nounset
+if [ -z "${1:-}" ] ; then
+	echo 1>&2 "Must provide filename to a geojson as arg 1"
+	exit 2
+fi
+
 
 #curl --fail -A "waterwaymap.org" -LO https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_0_countries_iso.zip
 #aunpack ne_10m_admin_0_countries_iso.zip
