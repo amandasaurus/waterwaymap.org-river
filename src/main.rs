@@ -977,7 +977,7 @@ fn get_or_create_zstd_dictionaries(
 fn connect_to_db(dbname: &Option<String>) -> Result<Client> {
     let dbpart = dbname
         .as_ref()
-        .map_or("".to_string(), |dbname| format!(" dbname=\"{}\" ", dbname));
+        .map_or("".to_string(), |dbname| format!(" dbname={} ", dbname));
     Ok(Client::connect(
         &format!(
             "host=/var/run/postgresql/ application_name=\"waterwaymap.org-river\"{}",
