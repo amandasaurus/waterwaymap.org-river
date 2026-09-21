@@ -1019,58 +1019,69 @@ fn langauge_codes() -> HashMap<String, String> {
     res
 }
 
+fn parse_etvf(json: &serde_json::Value) -> Option<HashMap<String, HashMap<String, f64>>> {
+    let json = json.as_object()?;
+
+    let mut res = HashMap::new();
+    for (tag, v) in json.iter() {
+        let v = v.as_object()?;
+        let inner_v = res.entry(tag.to_string()).or_insert(HashMap::new());
+        for (k, frac) in v.iter() {
+            inner_v.insert(k.to_string(), frac.as_f64()?);
+        }
+    }
+    Some(res)
+}
+
 fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<String, String>) {
     // names!
     // the `name` tag
-    let other_names = if let Some(vals) = river
-        .get("extra_tag_values_fraction")
-        .and_then(|x| x.get("name"))
-        .and_then(|x| x.as_object())
-        .map(|x| x.values())
-    {
-        vals.filter(|s| **s != river["name"])
-            .filter_map(|s| s.as_str())
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-    } else {
-        vec![]
-    };
+    river["other_names"] = json!([]);
+    river["other_lang_names"] = json!([]);
+    let Some(etvf) = river.get("extra_tag_values_fraction").and_then(|j| parse_etvf(j))  else { return; };
+    let other_names = etvf.get("name").map(|names| names.keys().filter(|n| *n != river["name"].as_str().unwrap())).into_iter().flatten().cloned().collect::<Vec<String>>();
 
     river["other_names"] = other_names.into();
 
-    //if !other_names.is_empty() {
-    //    dbg!(&other_names);
+    let name_tag_suffixes = include!("name_tag_suffixes.rs");
+
     //}
-    let mut other_langs: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
-    if let Some(names) = river
-        .get("extra_tag_values_fraction")
-        .and_then(|x| x.as_object())
-    {
-        for (k, v) in names.iter() {
-            if let Some(lang_code) = k.strip_prefix("name:")
-                && let Some(lang_name) = langauge_codes.get(lang_code)
-            {
-                let (_lang_code, names) = other_langs
-                    .entry(lang_name.to_owned())
-                    .or_insert((lang_code.to_string(), BTreeSet::new()));
-                names.extend(
-                    v.as_object()
-                        .unwrap()
-                        .keys()
-                        .map(|s| s.to_string()),
-                );
+    let mut other_langs: BTreeMap<String, (String, BTreeSet<String>, BTreeMap<String, BTreeSet<String>>)> = BTreeMap::new();
+
+    for (k, v) in etvf.iter() {
+        if let Some(lang_code) = k.strip_prefix("name:")
+            && let Some(lang_name) = langauge_codes.get(lang_code)
+        {
+            let (_lang_code, names, subnames) = other_langs
+                .entry(lang_name.to_owned())
+                .or_insert((lang_code.to_string(), BTreeSet::new(), BTreeMap::new()));
+
+            names.extend(
+                v.keys()
+                    .map(|s| s.to_string()),
+            );
+
+            // subnames are things like `name:cr-latin` / `name:ga:genitive`.
+            for (suff_tmpl, cat) in name_tag_suffixes {
+                let other_key = suff_tmpl.replace("%s", k);
+                if lang_code.contains(&other_key) || !etvf.contains_key(&other_key) {
+                    continue;
+                }
+                subnames.entry(cat.to_string()).or_default().extend(etvf.get(&other_key).unwrap().keys().cloned());
             }
         }
     }
-    other_langs.retain(|_lang_name, (_lang_code, names)| !names.is_empty());
+
+    other_langs.retain(|_lang_name, (_lang_code, names, _subnames)| !names.is_empty());
 
     let other_lang_names = other_langs
         .into_iter()
-        .map(|(lang_name, (code, names))| {
+        .map(|(lang_name, (code, names, subnames))| {
             json!({
                 "lang_name": lang_name,
                 "code": code,
                 "names": names.into_iter().collect::<Vec<String>>(),
+                "subnames": subnames.into_iter().map(|(cat, subnames)| (cat, subnames.into_iter().collect::<Vec<String>>())).collect::<Vec<(String, Vec<String>)>>(),
             })
         })
         .collect::<Vec<serde_json::Value>>();

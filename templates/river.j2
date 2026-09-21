@@ -104,16 +104,27 @@
 
   
   {% if other_names|length > 0 or other_lang_names|length > 0 %}
-  <p>
   {% if other_names|length > 0 %}
   This is also known as {% for name in names %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}.
   {% endif %}
   {% if other_lang_names|length > 0 %}
   In other languages {{ name }} is known as:
   <ul>
-	  {% for other_lang in other_lang_names %}
-	  <li><span title="name:{{ other_lang.code }}">{{ other_lang.lang_name }}</a>: {% for name in other_lang.names %}<span lang="{{ other_lang.code }}">{{ name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</li>
-	  {% endfor %}
+	  {% for other_lang in other_lang_names -%}
+	  <li>
+		<span title="name:{{ other_lang.code }}">{{ other_lang.lang_name }}</span>:&nbsp;
+		{%- for name in other_lang.names -%}
+			<span lang="{{ other_lang.code }}">{{ name }}</span>
+			{{ loop.last|if_false(", ") }}
+		{%- endfor -%}
+		{%- for cat, subnames in other_lang.subnames -%}
+			{{ loop.first|if_true("(") -}}
+			{{ cat }}: {% for n in subnames %}<span lang="{{ other_lang.code }}">{{ n }}</span>{{ loop.last|if_false(", ") }}{% endfor -%}
+			{{ loop.last|if_false(", ") }}
+			{{- loop.last|if_true(") ") -}}
+		{%- endfor -%}
+		</li>
+		{% endfor %}
    </ul>
    {% endif %}
    </p>
