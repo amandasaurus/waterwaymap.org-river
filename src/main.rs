@@ -1045,9 +1045,8 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
     if let Some(names) = river
         .get("extra_tag_values_fraction")
         .and_then(|x| x.as_object())
-        .map(|x| x.iter())
     {
-        for (k, v) in names {
+        for (k, v) in names.iter() {
             if let Some(lang_code) = k.strip_prefix("name:")
                 && let Some(lang_name) = langauge_codes.get(lang_code)
             {
