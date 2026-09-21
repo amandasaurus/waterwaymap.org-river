@@ -12,6 +12,7 @@ use postgres::{Client, NoTls, row::Row};
 use rayon::prelude::*;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::fs::File;
 use std::io::Read;
@@ -73,7 +74,9 @@ fn main() -> Result<()> {
         .init();
 
     let args = Args::parse();
-    let last_modified_value = chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT").to_string();
+    let last_modified_value = chrono::Utc::now()
+        .format("%a, %d %b %Y %H:%M:%S GMT")
+        .to_string();
 
     let global_http_response_headers = vec![
         ("X-Clacks-Overhead", "GNU Terry Pratchett"),
@@ -96,6 +99,8 @@ fn main() -> Result<()> {
         fs::remove_file(&args.output_site_db)?;
     }
     let mut output_site_db = SqliteSite::create(&args.output_site_db)?;
+
+    let langauge_codes = langauge_codes();
 
     // Test connection to database
     connect_to_db(&args.dbname).context("Cannot connect to database")?;
@@ -136,6 +141,7 @@ fn main() -> Result<()> {
         &mut output_site_db,
         global_http_response_headers.as_slice(),
         &zstd_dictionaries,
+        &langauge_codes,
     )
     .context("Creating individual_river_pages")?;
 
@@ -169,7 +175,9 @@ fn row_to_json(row: Row) -> Result<Value> {
             ),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
-            postgres::types::Type::TIMESTAMPTZ => json!((row.get::<_, chrono::DateTime<chrono::Utc>>(i)).to_rfc3339()),
+            postgres::types::Type::TIMESTAMPTZ => {
+                json!((row.get::<_, chrono::DateTime<chrono::Utc>>(i)).to_rfc3339())
+            }
             _ => unimplemented!("Unknown type {:?}", col.type_()),
         };
         obj.insert(column_name.to_string(), value);
@@ -331,11 +339,12 @@ fn name_index_pages(
 
         let rivers: Vec<serde_json::Value> = do_query(&mut conn, &stmt, &[&bin_start, &bin_end])?;
 
-        urls_for_sitemap.extend(
-            rivers
-                .iter()
-                .map(|r| url_prefix.join(r["url_path"].as_str().unwrap()).display().to_string()),
-        );
+        urls_for_sitemap.extend(rivers.iter().map(|r| {
+            url_prefix
+                .join(r["url_path"].as_str().unwrap())
+                .display()
+                .to_string()
+        }));
 
         let data = serde_json::json!({
             "rivers": rivers,
@@ -413,6 +422,7 @@ fn individual_river_pages(
     output_site_db: &mut SqliteSite,
     global_http_response_headers: &[(&str, &str)],
     zstd_dictionaries: &HashMap<String, (u32, Box<[u8]>)>,
+    langauge_codes: &HashMap<String, String>,
 ) -> Result<()> {
     let _elapsed = ElapsedPrinter::start("all individual_river_pages");
     let mut conn1 = connect_to_db(&args.dbname)?;
@@ -589,6 +599,8 @@ fn individual_river_pages(
             .into();
         }
         river["is_in_regions"] = admin0s.into();
+
+        calc_extra_names(&mut river, &langauge_codes);
 
         // Render the template!
         let content = template.render(&river)?;
@@ -989,4 +1001,80 @@ fn connect_to_db(dbname: &Option<String>) -> Result<Client> {
         ),
         NoTls,
     )?)
+}
+
+fn langauge_codes() -> HashMap<String, String> {
+    let codes: serde_json::Value = serde_json::from_str(include_str!("languages.json")).unwrap();
+    let mut codes = codes["main"]["en"]["localeDisplayNames"]["languages"].clone();
+    let codes = codes.as_object_mut().unwrap();
+    let res = codes
+        .iter()
+        .map(|(k, v)| (k.to_owned(), v.as_str().unwrap().to_owned()))
+        .collect::<HashMap<String, String>>();
+
+    res
+}
+
+fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<String, String>) {
+    // names!
+    // the `name` tag
+    let other_names = if let Some(vals) = river
+        .get("extra_tag_values_fraction")
+        .and_then(|x| x.get("name"))
+        .and_then(|x| x.as_object())
+        .map(|x| x.values())
+    {
+        vals.filter(|s| **s != river["name"])
+            .filter_map(|s| s.as_str())
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>()
+    } else {
+        vec![]
+    };
+
+    river["other_names"] = other_names.into();
+
+    //if !other_names.is_empty() {
+    //    dbg!(&other_names);
+    //}
+    let mut other_langs: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
+    if let Some(names) = river
+        .get("extra_tag_values_fraction")
+        .and_then(|x| x.as_object())
+        .map(|x| x.iter())
+    {
+        for (k, v) in names {
+            if let Some(lang_code) = k.strip_prefix("name:")
+                && let Some(lang_name) = langauge_codes.get(lang_code)
+            {
+                let (_lang_code, names) = other_langs
+                    .entry(lang_name.to_owned())
+                    .or_insert((lang_code.to_string(), BTreeSet::new()));
+                names.extend(
+                    v.as_object()
+                        .unwrap()
+                        .keys()
+                        .filter(|name| {
+                            !(lang_code == "en"
+                                && river["name"].as_str().is_some_and(|n| n == *name))
+                        })
+                        .map(|s| s.to_string()),
+                );
+            }
+        }
+    }
+    other_langs.retain(|_lang_name, (_lang_code, names)| !names.is_empty());
+
+    let other_lang_names = other_langs
+        .into_iter()
+        .map(|(lang_name, (code, names))| {
+            json!({
+                "lang_name": lang_name,
+                "code": code,
+                "names": names.into_iter().collect::<Vec<String>>(),
+            })
+        })
+        .collect::<Vec<serde_json::Value>>();
+
+    river["other_lang_names"] = other_lang_names.into();
 }

@@ -102,6 +102,22 @@
         </span>
       </div>
 
+  {% if other_names|length > 0 %}
+  <p>This is also known as {% for name in names %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+  {% endif %}
+
+
+  {% if other_lang_names|length > 0 %}
+  <h3>Other languages</h3>
+  In other languages this is known as:
+  <ul>
+	  {% for other_lang in other_lang_names %}
+	  <li>{{ other_lang.lang_name }}: {% for name in other_lang.names %}<span lang="{{ other_lang.code }}">{{ name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</li>
+	  {% endfor %}
+   </ul>
+   {% endif %}
+	
+
   <h2>Distributaries / Outflows</h2>
 
   {% if side_channels %}
