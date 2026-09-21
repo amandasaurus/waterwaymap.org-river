@@ -102,13 +102,13 @@
         </span>
       </div>
 
+  
+  {% if other_names|length > 0 or other_lang_names|length > 0 %}
+  <p>
   {% if other_names|length > 0 %}
-  <p>This is also known as {% for name in names %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+  This is also known as {% for name in names %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}.
   {% endif %}
-
-
   {% if other_lang_names|length > 0 %}
-  <h3>Other languages</h3>
   In other languages this is known as:
   <ul>
 	  {% for other_lang in other_lang_names %}
@@ -116,6 +116,25 @@
 	  {% endfor %}
    </ul>
    {% endif %}
+   </p>
+   {% endif %}
+
+  {% if main_wikipedia|length > 0 or wikidata|length > 0 %}
+  <p>
+  {% if main_wikipedia|length == 1 %}
+  On Wikipedia it's <a href="https://{{ main_wikipedia[0].lang_code }}.wikipedia.org/wiki/{{ main_wikipedia[0].article_name }}">{{ main_wikipedia[0].article_name }}</a>.
+  {% elif main_wikipedia|length > 1 %}
+  The follow Wikipedia articles are about it: {% for wikipedia in main_wikipedia %}<a href="https://{{ wikipedia.lang_code }}.wikipedia.org/wiki/{{ wikipedia.article_name }}">{{ wikipedia.article_name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+  {% endif %}
+
+  {% if wikidata|length == 1 %}
+  On Wikidata it's <a href="https://www.wikidata.org/entity/{{ wikidata[0] }}"><code>{{ wikidata[0] }}</code></a>.
+  {% elif wikidata|length > 1 %}
+  <p>It's the following objects on Wikidata: {% for wikidata in wikidata %} <a href="https://www.wikidata.org/entity/{{ wikidata }}"><code>{{ wikidata }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}.
+  {% endif %}
+  </p>
+  {% endif %}
+
 	
 
   <h2>Distributaries / Outflows</h2>

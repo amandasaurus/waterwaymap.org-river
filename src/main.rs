@@ -601,6 +601,7 @@ fn individual_river_pages(
         river["is_in_regions"] = admin0s.into();
 
         calc_extra_names(&mut river, &langauge_codes);
+        calc_wikipedias(&mut river, &langauge_codes);
 
         // Render the template!
         let content = template.render(&river)?;
@@ -1003,6 +1004,7 @@ fn connect_to_db(dbname: &Option<String>) -> Result<Client> {
     )?)
 }
 
+/// Load the unicode list of language names
 fn langauge_codes() -> HashMap<String, String> {
     let codes: serde_json::Value = serde_json::from_str(include_str!("languages.json")).unwrap();
     let mut codes = codes["main"]["en"]["localeDisplayNames"]["languages"].clone();
@@ -1077,4 +1079,61 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
         .collect::<Vec<serde_json::Value>>();
 
     river["other_lang_names"] = other_lang_names.into();
+}
+
+fn calc_wikipedias(river: &mut serde_json::Value, langauge_codes: &HashMap<String, String>) {
+    river["main_wikipedia"] = json!([]);
+    if let Some(wikipedia_raw) = river
+        .get("extra_tag_values_fraction")
+        .and_then(|x| x.get("wikipedia"))
+        .and_then(|x| x.as_object())
+    {
+        let wikipedia_raw = wikipedia_raw.keys().filter(|x| x.contains(":")).map(|x| {
+            let mut parts = x.splitn(2, ':');
+            let lang_code = parts.next().unwrap();
+            let article_name = parts.next().unwrap();
+            json!({"lang_code": lang_code.to_string(), "article_name": article_name.to_string()})
+        }).collect::<Vec<_>>();
+
+        river["main_wikipedia"] = wikipedia_raw.into();
+    }
+
+    river["wikidata"] = json!([]);
+    if let Some(wikidata_raw) = river
+        .get("extra_tag_values_fraction")
+        .and_then(|x| x.get("wikidata"))
+        .and_then(|x| x.as_object())
+    {
+        river["wikidata"] = wikidata_raw.keys().cloned().collect::<Vec<String>>().into()
+    }
+
+    let mut other_wikipedias: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
+    river["other_wikipedias"] = json!([]);
+    if let Some(others) = river
+        .get("extra_tag_values_fraction")
+        .and_then(|x| x.as_object())
+    {
+        for (k, v) in others.iter().filter(|(k, _v)| k.starts_with("wikipedia:")) {
+            let k = k.strip_prefix("wikipedia:").unwrap();
+            let Some(lang_name) = langauge_codes.get(k) else {
+                continue;
+            };
+            let (_lang_code, article_titles) = other_wikipedias
+                .entry(lang_name.clone())
+                .or_insert((k.to_string(), BTreeSet::new()));
+            article_titles.extend(v.as_object().unwrap().keys().cloned());
+        }
+    }
+    let other_wikipedias = other_wikipedias
+        .into_iter()
+        .map(|(lang_name, (code, names))| {
+            json!({
+                "lang_name": lang_name,
+                "code": code,
+                "names": names.into_iter().collect::<Vec<String>>(),
+            })
+        })
+        .collect::<Vec<serde_json::Value>>();
+
+    river["other_lang_wikipedias"] = other_wikipedias.into();
 }
