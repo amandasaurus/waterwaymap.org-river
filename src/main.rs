@@ -1057,10 +1057,6 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
                     v.as_object()
                         .unwrap()
                         .keys()
-                        .filter(|name| {
-                            !(lang_code == "en"
-                                && river["name"].as_str().is_some_and(|n| n == *name))
-                        })
                         .map(|s| s.to_string()),
                 );
             }
