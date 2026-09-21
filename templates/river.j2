@@ -112,7 +112,7 @@
   In other languages {{ name }} is known as:
   <ul>
 	  {% for other_lang in other_lang_names %}
-	  <li>{{ other_lang.lang_name }}: {% for name in other_lang.names %}<span lang="{{ other_lang.code }}">{{ name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</li>
+	  <li><span title="name:{{ other_lang.code }}">{{ other_lang.lang_name }}</a>: {% for name in other_lang.names %}<span lang="{{ other_lang.code }}">{{ name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</li>
 	  {% endfor %}
    </ul>
    {% endif %}
