@@ -169,6 +169,7 @@ fn row_to_json(row: Row) -> Result<Value> {
             ),
             postgres::types::Type::VARCHAR => json!(row.get::<_, Option<String>>(i)),
             postgres::types::Type::TEXT => json!(row.get::<_, Option<String>>(i)),
+            postgres::types::Type::TIMESTAMPTZ => json!((row.get::<_, chrono::DateTime<chrono::Utc>>(i)).to_rfc3339()),
             _ => unimplemented!("Unknown type {:?}", col.type_()),
         };
         obj.insert(column_name.to_string(), value);
@@ -462,6 +463,7 @@ fn individual_river_pages(
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
+            extra_tag_values_fraction,
             ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
             ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
