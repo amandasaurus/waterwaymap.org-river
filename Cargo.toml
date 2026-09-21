@@ -25,7 +25,7 @@ env_logger = "0.11.11"
 log = "0.4.34"
 num-format = "0.4.4"
 zstd = "0.13.3"
-postgres = { version = "0.19.14", features = ["with-serde_json-1"] }
+postgres = { version = "0.19.14", features = ["with-chrono-0_4", "with-serde_json-1"] }
 itertools = "0.15.0"
 ordered-float = "5.5.0"
 chrono = "0.4.45"
