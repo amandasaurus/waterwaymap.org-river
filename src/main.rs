@@ -464,6 +464,8 @@ fn individual_river_pages(
             branching_distributaries, terminal_distributaries, distributaries_sea,
             side_channels, tributaries,
             extra_tag_values_fraction,
+            to_char(latest_timestamp_iso AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS latest_timestamp_iso,
+            to_char(latest_timestamp_iso AT TIME ZONE 'UTC',  'Dy, DD Mon YYYY HH24:MI') AS latest_timestamp_human,
             ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
             ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
             from planet_grouped_waterways
