@@ -8,4 +8,5 @@
 *.geojsons
 *.geojson
 *.sqlitesite
+*.sqlitesite-journal
 *.gpkg
