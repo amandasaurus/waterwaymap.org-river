@@ -72,7 +72,7 @@
             class="inline_centre"
 			title="Edit in JOSM"
             @click="let map = document.map; let b = map.getBounds();
-			let josm_url = `http://localhost:8111/import?layer_name={{ name }}&upload=never&new_layer=true&changeset_source=${encodeURIComponent(location.href)}&changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&url=${encodeURIComponent(location.href+'geometry.geojson')}`;
+			let josm_url = `http://localhost:8111/load_object?layer_name={{ name }}&new_layer=true&changeset_source=${encodeURIComponent(location.href)}&changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&objects=${encodeURIComponent('{{ objids_list }}')}`;
 			let res_ok = await fetch(josm_url).then(r => r.ok).catch(e => false);
 			this.disabled = false;
 			if (!res_ok) {
@@ -81,7 +81,7 @@
 			}"
           >
             <img src="{{url_prefix}}img/josm.svg" alt="JOSM logo" style="height: 1em" /> edit waterway
-            in josm <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
+            in josm ({{ num_osm_objects }} objects) <img src="{{url_prefix}}img/open_ext.svg" style="height: 1em" />
           </button>
           <span x-transition x-show="show_josm_not_running"
             >JOSM isn't running...</span
