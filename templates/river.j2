@@ -72,7 +72,7 @@
             class="inline_centre"
 			title="Edit in JOSM"
             @click="let map = document.map; let b = map.getBounds();
-			let josm_url = `http://localhost:8111/load_object?layer_name={{ name }}&new_layer=true&changeset_source=${encodeURIComponent(location.href)}&changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&objects=${encodeURIComponent('{{ objids_list }}')}`;
+			let josm_url = `http://localhost:8111/load_object?{% if name %}layer_name={{ name }}&{% endif %}new_layer=true&changeset_source=${encodeURIComponent(location.href)}&changeset_hashtags=${encodeURIComponent('#WaterwayMapOrg')}&objects=${encodeURIComponent('{{ objids_list }}')}`;
 			let res_ok = await fetch(josm_url).then(r => r.ok).catch(e => false);
 			this.disabled = false;
 			if (!res_ok) {
