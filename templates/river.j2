@@ -103,7 +103,7 @@
       </div>
 
   
-  {% if other_names|length > 0 or other_lang_names|length > 0 %}
+  {% if other_names|default([])|length > 0 or other_lang_names|default([])|length > 0 %}
   {% if other_names|length > 0 %}
   This is also known as {% for name in names %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}.
   {% endif %}
@@ -130,8 +130,9 @@
    </p>
    {% endif %}
 
-  {% if main_wikipedia|length > 0 or wikidata|length > 0 %}
+  {% if main_wikipedia|default([])|length > 0 or wikidata|default([])|length > 0 or refs|default([])|length > 0 %}
   <p>
+
   {% if main_wikipedia|length == 1 %}
   On Wikipedia {{ name }} is <a href="https://{{ main_wikipedia[0].lang_code }}.wikipedia.org/wiki/{{ main_wikipedia[0].article_name }}">{{ main_wikipedia[0].article_name }}</a>.
   {% elif main_wikipedia|length > 1 %}
@@ -143,6 +144,11 @@
   {% elif wikidata|length > 1 %}
   <p>It's the following objects on Wikidata: {% for wikidata in wikidata %} <a href="https://www.wikidata.org/entity/{{ wikidata }}"><code>{{ wikidata }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}.
   {% endif %}
+
+  {% for ref in refs %}
+  On {{ ref.human_name }} (<a href="https://wiki.openstreetmap.org/wiki/Key:{{ ref.tag }}"><code>{{ ref.tag }}</code></a>) it's {% for item in ref.items %}{{ item }}{{ loop.last|if_false(", ") }}{% endfor %}
+  {% endfor %}
+
   </p>
   {% endif %}
 
