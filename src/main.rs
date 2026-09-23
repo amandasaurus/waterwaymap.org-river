@@ -23,8 +23,6 @@ use zstd::bulk::Compressor;
 mod utils;
 use utils::*;
 
-
-
 const FILEEXT_HTTP_RESP_HEADERS: &[(&str, &[(&str, &str)])] = &[
     ("css", &[("content-type", "text/css")]),
     ("html", &[("content-type", "text/html; charset=utf-8")]),
@@ -604,12 +602,14 @@ fn individual_river_pages(
         }
         river["is_in_regions"] = admin0s.into();
 
-		if let Some(etvf) = river.get("extra_tag_values_fraction").and_then(|j| parse_etvf(j))
-		{
-			calc_extra_names(&mut river, &langauge_codes, &etvf);
-			calc_wikipedias(&mut river, &langauge_codes, &etvf);
-			calc_refs(&mut river, &etvf);
-		}
+        if let Some(etvf) = river
+            .get("extra_tag_values_fraction")
+            .and_then(|j| parse_etvf(j))
+        {
+            calc_extra_names(&mut river, &langauge_codes, &etvf);
+            calc_wikipedias(&mut river, &langauge_codes, &etvf);
+            calc_refs(&mut river, &etvf);
+        }
 
         // Render the template!
         let content = template.render(&river)?;
@@ -905,8 +905,10 @@ fn setup_jinja_env<'b>(args: &'b Args) -> Result<minijinja::Environment<'b>> {
     env.add_global("url_prefix", url_prefix.clone());
 
     for kv in args.extra_vars.iter() {
-        let mut kv_parts = kv.splitn(2, "=");
-        env.add_global(kv_parts.next().unwrap(), kv_parts.next().unwrap());
+        let (k, v) = kv
+            .split_once("=")
+            .ok_or(anyhow::anyhow!("Extra arg must contain ="))?;
+        env.add_global(k, v);
     }
 
     // Custom filters
@@ -1027,8 +1029,7 @@ fn langauge_codes() -> HashMap<String, String> {
 
 type ExtraTagValuesFraction = HashMap<String, HashMap<String, f64>>;
 
-fn parse_etvf(json: &serde_json::Value) -> Option<ExtraTagValuesFraction>
-{
+fn parse_etvf(json: &serde_json::Value) -> Option<ExtraTagValuesFraction> {
     let json = json.as_object()?;
 
     let mut res = HashMap::new();
@@ -1042,20 +1043,36 @@ fn parse_etvf(json: &serde_json::Value) -> Option<ExtraTagValuesFraction>
     Some(res)
 }
 
-fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<String, String>, etvf: &ExtraTagValuesFraction) {
+fn calc_extra_names(
+    river: &mut serde_json::Value,
+    langauge_codes: &HashMap<String, String>,
+    etvf: &ExtraTagValuesFraction,
+) {
     // names!
     // the `name` tag
     river["other_names"] = json!([]);
     river["other_lang_names"] = json!([]);
-    let Some(etvf) = river.get("extra_tag_values_fraction").and_then(|j| parse_etvf(j))  else { return; };
-    let other_names = etvf.get("name").map(|names| names.keys().filter(|n| *n != river["name"].as_str().unwrap())).into_iter().flatten().cloned().collect::<Vec<String>>();
+    let other_names = etvf
+        .get("name")
+        .map(|names| {
+            names
+                .keys()
+                .filter(|n| *n != river["name"].as_str().unwrap())
+        })
+        .into_iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<String>>();
 
     river["other_names"] = other_names.into();
 
     let name_tag_suffixes = include!("name_tag_suffixes.rs");
 
     //}
-    let mut other_langs: BTreeMap<String, (String, BTreeSet<String>, BTreeMap<String, BTreeSet<String>>)> = BTreeMap::new();
+    let mut other_langs: BTreeMap<
+        String,
+        (String, BTreeSet<String>, BTreeMap<String, BTreeSet<String>>),
+    > = BTreeMap::new();
 
     for (k, v) in etvf.iter() {
         if let Some(lang_code) = k.strip_prefix("name:")
@@ -1065,10 +1082,7 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
                 .entry(lang_name.to_owned())
                 .or_insert((lang_code.to_string(), BTreeSet::new(), BTreeMap::new()));
 
-            names.extend(
-                v.keys()
-                    .map(|s| s.to_string()),
-            );
+            names.extend(v.keys().map(|s| s.to_string()));
 
             // subnames are things like `name:cr-latin` / `name:ga:genitive`.
             for (suff_tmpl, cat) in name_tag_suffixes {
@@ -1076,7 +1090,10 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
                 if lang_code.contains(&other_key) || !etvf.contains_key(&other_key) {
                     continue;
                 }
-                subnames.entry(cat.to_string()).or_default().extend(etvf.get(&other_key).unwrap().keys().cloned());
+                subnames
+                    .entry(cat.to_string())
+                    .or_default()
+                    .extend(etvf.get(&other_key).unwrap().keys().cloned());
             }
         }
     }
@@ -1098,17 +1115,15 @@ fn calc_extra_names(river: &mut serde_json::Value, langauge_codes: &HashMap<Stri
     river["other_lang_names"] = other_lang_names.into();
 }
 
-fn calc_wikipedias(river: &mut serde_json::Value, langauge_codes: &HashMap<String, String>, etvf: &ExtraTagValuesFraction) {
+fn calc_wikipedias(
+    river: &mut serde_json::Value,
+    langauge_codes: &HashMap<String, String>,
+    etvf: &ExtraTagValuesFraction,
+) {
     river["main_wikipedia"] = json!([]);
-    if let Some(wikipedia_raw) = river
-        .get("extra_tag_values_fraction")
-        .and_then(|x| x.get("wikipedia"))
-        .and_then(|x| x.as_object())
-    {
+    if let Some(wikipedia_raw) = etvf.get("wikipedia") {
         let wikipedia_raw = wikipedia_raw.keys().filter(|x| x.contains(":")).map(|x| {
-            let mut parts = x.splitn(2, ':');
-            let lang_code = parts.next().unwrap();
-            let article_name = parts.next().unwrap();
+            let (lang_code, article_name) = x.split_once(':').unwrap();
             json!({"lang_code": lang_code.to_string(), "article_name": article_name.to_string()})
         }).collect::<Vec<_>>();
 
@@ -1116,11 +1131,7 @@ fn calc_wikipedias(river: &mut serde_json::Value, langauge_codes: &HashMap<Strin
     }
 
     river["wikidata"] = json!([]);
-    if let Some(wikidata_raw) = river
-        .get("extra_tag_values_fraction")
-        .and_then(|x| x.get("wikidata"))
-        .and_then(|x| x.as_object())
-    {
+    if let Some(wikidata_raw) = etvf.get("wikidata") {
         river["wikidata"] = wikidata_raw.keys().cloned().collect::<Vec<String>>().into()
     }
 
@@ -1156,19 +1167,22 @@ fn calc_wikipedias(river: &mut serde_json::Value, langauge_codes: &HashMap<Strin
 }
 
 fn calc_refs(river: &mut serde_json::Value, etvf: &ExtraTagValuesFraction) {
-	let ref_formats = include!("refs_formatting.rs");
-	let mut refs: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
+    let ref_formats = include!("refs_formatting.rs");
+    let mut refs: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
 
-	for (tag, name, tmpl) in ref_formats {
-		let Some(values) = etvf.get(tag) else { continue; };
-		let out_values = refs.entry(name.to_owned()).or_insert((tag.to_owned(), BTreeSet::new()));
-		out_values.1.extend(
-			values.keys().map(|k| tmpl.replace("%s", k))
-		);
-	}
+    for (tag, name, tmpl) in ref_formats {
+        let Some(values) = etvf.get(tag) else {
+            continue;
+        };
+        let out_values = refs
+            .entry(name.to_owned())
+            .or_insert((tag.to_owned(), BTreeSet::new()));
+        out_values
+            .1
+            .extend(values.keys().map(|k| tmpl.replace("%s", k)));
+    }
 
-	let refs = refs.into_iter().map(|(k, v)| json!({"human_name": k, "tag": v.0, "items": v.1.into_iter().collect::<Vec<String>>()}) ).collect::<Vec<_>>();
+    let refs = refs.into_iter().map(|(k, v)| json!({"human_name": k, "tag": v.0, "items": v.1.into_iter().collect::<Vec<String>>()}) ).collect::<Vec<_>>();
 
-	river["refs"] = refs.into();
-
+    river["refs"] = refs.into();
 }
