@@ -1,5 +1,31 @@
 {% extends "base.j2" %}
 {% block title %}Page not found{% endblock %}
+{% block extra_head_content %}
+<script>
+  function computeSearchTerm() {
+	console.log("Here we calculate the path");
+	var path = window.location.pathname;
+	path = path.replace(/^\/river\//, "");
+	path = path.replace(/\/$/, "");
+	path = decodeURI(path);
+	path = path.replace(/ [0-9]+$/, "");
+
+	console.log(path);
+	return path;
+  }
+
+  window.__gcse = {
+    callback: function () {
+      const query = computeSearchTerm();
+      const element = google.search.cse.element.getElement('mysearch');
+      if (element && query) {
+        element.execute(query);   // populates the box and runs the search
+      }
+    }
+  };
+</script>
+{% endblock %}
+
 {% block body %}
   <h1>Page not found</h1>
 
@@ -8,5 +34,5 @@
 
   <script async src="https://cse.google.com/cse.js?cx=16716709005c64982">
   </script>
-  <div class="gcse-search"></div>
+  <div class="gcse-search" data-gname="mysearch"></div>
 {% endblock %}
