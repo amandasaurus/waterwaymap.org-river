@@ -1048,22 +1048,21 @@ fn calc_extra_names(
     langauge_codes: &HashMap<String, String>,
     etvf: &ExtraTagValuesFraction,
 ) {
+	let length_m: f64 = river["length_m"].as_f64().unwrap();
     // names!
     // the `name` tag
     river["other_names"] = json!([]);
     river["other_lang_names"] = json!([]);
-    let other_names = etvf
+    let mut other_names = etvf
         .get("name")
-        .map(|names| {
-            names
-                .keys()
-                .filter(|n| *n != river["name"].as_str().unwrap())
-        })
-        .into_iter()
-        .flatten()
-        .cloned()
-        .collect::<Vec<String>>();
+		.map(|o| o.iter())
+		.into_iter()
+		.flatten()
+		.filter(|(n, _frac)| river.get("name").and_then(|x| x.as_str()).is_none_or(|name_tag| name_tag != *n))
+		.map(|(n, frac)| json!({"name": n, "fraction": frac, "length_m": (frac*length_m), "percent": (frac*100.).ceil() as i64}))
+        .collect::<Vec<_>>();
 
+	other_names.sort_by(|a, b| a["length_m"].as_f64().unwrap().total_cmp(&b["length_m"].as_f64().unwrap()).reverse());
     river["other_names"] = other_names.into();
 
     let name_tag_suffixes = include!("name_tag_suffixes.rs");
