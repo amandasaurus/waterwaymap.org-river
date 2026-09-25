@@ -50,6 +50,20 @@ function set_up_map(geojson, bbox) {
             "line-width": 5,
           },
         },
+
+	  {
+			id: 'river-flow',
+			type: 'line',
+			source: 'river',
+			layout: { 'line-join': 'round' }, // keep cap 'butt' so dashes stay crisp
+			paint: {
+			  'line-color': '#cfeaff',
+			  'line-width': 4,
+			  'line-opacity': 0.8,
+			  'line-dasharray': [0, 4, 3]
+			}
+	  },
+
       ],
     },
   });
@@ -67,6 +81,25 @@ function set_up_map(geojson, bbox) {
 
   map.setPadding({ top: 57 });
   map.fitBounds(bbox);
+
+
+	// Each step shifts the dash pattern slightly along the line
+	const dashSeq = [
+		[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5],
+		[2, 4, 1], [2.5, 4, 0.5], [3, 4, 0],
+		[0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5],
+		[0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]
+	];
+	let step = -1;
+	function animate(t) {
+		const next = Math.floor((t / 250) % dashSeq.length); // 60 ms per step; raise to slow down
+		if (next !== step) {
+			map.setPaintProperty('river-flow', 'line-dasharray', dashSeq[next]);
+			step = next;
+		}
+		requestAnimationFrame(animate);
+	}
+	requestAnimationFrame(animate);
 
   var scale = new maplibregl.ScaleControl({
     maxWidth: 200,
