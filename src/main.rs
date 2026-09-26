@@ -1125,6 +1125,7 @@ fn calc_wikipedias(
     langauge_codes: &HashMap<String, String>,
     etvf: &ExtraTagValuesFraction,
 ) {
+    let length_m: f64 = river["length_m"].as_f64().unwrap();
     river["main_wikipedia"] = json!([]);
     if let Some(wikipedia_raw) = etvf.get("wikipedia") {
         let wikipedia_raw = wikipedia_raw.keys().filter(|x| x.contains(":")).map(|x| {
@@ -1137,7 +1138,18 @@ fn calc_wikipedias(
 
     river["wikidata"] = json!([]);
     if let Some(wikidata_raw) = etvf.get("wikidata") {
-        river["wikidata"] = wikidata_raw.keys().cloned().collect::<Vec<String>>().into()
+        let mut wikidata = wikidata_raw.iter()
+                    .map(|(wd, frac)| json!({"wikidata": wd, "fraction": frac, "length_m": (frac*length_m), "percent": (frac*100.).ceil() as i64}))
+        .collect::<Vec<_>>();
+
+        wikidata.sort_by(|a, b| {
+            a["length_m"]
+                .as_f64()
+                .unwrap()
+                .total_cmp(&b["length_m"].as_f64().unwrap())
+                .reverse()
+        });
+        river["wikidata"] = wikidata.into();
     }
 
     let mut other_wikipedias: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();

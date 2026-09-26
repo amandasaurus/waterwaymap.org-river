@@ -115,6 +115,7 @@
 	  <li>
 		<span title="name:{{ other_lang.code }}">{{ other_lang.lang_name }}</span>:&nbsp;
 		{%- for name in other_lang.names -%}
+		{{ other_lang }}
 			<span lang="{{ other_lang.code }}">{{ name }}</span>
 			{{ loop.last|if_false(", ") }}
 		{%- endfor -%}
@@ -140,11 +141,17 @@
   The follow Wikipedia articles are about it: {% for wikipedia in main_wikipedia %}<a href="https://{{ wikipedia.lang_code }}.wikipedia.org/wiki/{{ wikipedia.article_name }}">{{ wikipedia.article_name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
   {% endif %}
 
-  {% if wikidata|length == 1 %}
-  On Wikidata it's <a href="https://www.wikidata.org/entity/{{ wikidata[0] }}"><code>{{ wikidata[0] }}</code></a>.
-  {% elif wikidata|length > 1 %}
-  <p>It's the following objects on Wikidata: {% for wikidata in wikidata %} <a href="https://www.wikidata.org/entity/{{ wikidata }}"><code>{{ wikidata }}</code></a>{% if not loop.last %}, {% endif %}{% endfor %}.
-  {% endif %}
+  {% for wd in wikidata %}
+	{% if loop.first %}
+		{% if loop.length ==  1 %}<p>On Wikidata it's 
+		{% else %}<p>It's the following objects on Wikidata:
+		{% endif %}
+	{% endif %}
+    <a href="https://www.wikidata.org/entity/{{ wd.wikidata }}"><code>{{ wd.wikidata }}</code></a>
+	{% if wd.percent < 95 %}(for {{ wd.length_m|fmt_length }}, {{ wd.percent }}%)){% endif %}
+	{{ (loop.length > 1 and loop.last)|if_false(", ") }}
+	{{ loop.last|if_true(".</p>") }}
+  {% endfor %}
 
   {% for ref in refs %}
   On {{ ref.human_name }} (<a href="https://wiki.openstreetmap.org/wiki/Key:{{ ref.tag }}"><code>{{ ref.tag }}</code></a>) it's {% for item in ref.items %}{{ item }}{{ loop.last|if_false(", ") }}{% endfor %}
