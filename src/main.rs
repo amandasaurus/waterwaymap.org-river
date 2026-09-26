@@ -1048,7 +1048,7 @@ fn calc_extra_names(
     langauge_codes: &HashMap<String, String>,
     etvf: &ExtraTagValuesFraction,
 ) {
-	let length_m: f64 = river["length_m"].as_f64().unwrap();
+    let length_m: f64 = river["length_m"].as_f64().unwrap();
     // names!
     // the `name` tag
     river["other_names"] = json!([]);
@@ -1062,7 +1062,13 @@ fn calc_extra_names(
 		.map(|(n, frac)| json!({"name": n, "fraction": frac, "length_m": (frac*length_m), "percent": (frac*100.).ceil() as i64}))
         .collect::<Vec<_>>();
 
-	other_names.sort_by(|a, b| a["length_m"].as_f64().unwrap().total_cmp(&b["length_m"].as_f64().unwrap()).reverse());
+    other_names.sort_by(|a, b| {
+        a["length_m"]
+            .as_f64()
+            .unwrap()
+            .total_cmp(&b["length_m"].as_f64().unwrap())
+            .reverse()
+    });
     river["other_names"] = other_names.into();
 
     let name_tag_suffixes = include!("name_tag_suffixes.rs");
