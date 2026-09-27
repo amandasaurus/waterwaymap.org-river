@@ -524,6 +524,8 @@ fn individual_river_pages(
     for mut river in rivers_iter.into_iter() {
         bar.inc(1);
         parse_inner_json_value(&mut river["geom"])?;
+        let url = full_url1(url_prefix, river["url_path"].as_str().unwrap());
+        river["url"] = url.clone().into();
 
         river["num_tributaries"] = river["tributaries"].as_array().unwrap().len().into();
         river["num_distributaries"] = (river["terminal_distributaries"].as_array().unwrap().len()
@@ -625,12 +627,12 @@ fn individual_river_pages(
 
         assert!(
             !output_site_db_bulk_adder
-                .url_exists(full_url1(url_prefix, river["url_path"].as_str().unwrap()))?,
+                .url_exists(&url)?,
             "{:?}",
             river["url_path"]
         );
         output_site_db_bulk_adder.add_unique_url(
-            full_url1(url_prefix, river["url_path"].as_str().unwrap()),
+            url,
             html_zstd_dict_id,
             html_hdr_idx,
             content,
@@ -906,6 +908,7 @@ fn setup_jinja_env<'b>(args: &'b Args) -> Result<minijinja::Environment<'b>> {
     let url_prefix: String = args.url_prefix.to_str().map(String::from).unwrap();
     env.add_global("url_prefix", url_prefix.clone());
 
+    env.add_global("url_host", "https://waterwaymap.org");
     for kv in args.extra_vars.iter() {
         let (k, v) = kv
             .split_once("=")
