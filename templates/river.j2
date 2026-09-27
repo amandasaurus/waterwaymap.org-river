@@ -161,7 +161,7 @@
 
 	
 
-  <h2>Distributaries / Outflows</h2>
+  <h2>Distributaries & Outflows</h2>
 
   {% if side_channels %}
   <p>
@@ -228,10 +228,30 @@
   </div>
 
 
-  <h2>Tributaries</h2>
+  <h2>Tributaries & Inflows</h2>
   <div id=tributaries>
-  <p>{{ name|default("It", true) }} has {{ tributaries|length }} tributaries.</p>
+  <p>
+	{{ name|default("It", true) }} has {{ tributaries|length }} tributaries
+	{% if parent_rivers|length > 0 %} and {{ parent_rivers|length }} parent river(s){% endif %}
+	.</p>
   <ul>
+  {% for parent in parent_rivers %}
+    <li data-name="{{ parent['name'] }}">
+      {{ river_link_name(parent) }}
+      {%- if parent['confluences']|length == 1 %}
+		  , which joins it at {{ parent['confluences'][0]|fmt_latlng }}
+		  at OSM node {{ parent['confluences'][0]['nid']|fmt_nid }}, 
+		  and {{ parent['confluences'][0]['upstream_m']|fmt_length }} of total upstream flows in.
+      {%- elif parent['confluences']|length > 1 %}
+        , which joins it at the following points:
+          {% for conf in parent['confluences'] %}
+            {{ conf['upstream_m']|fmt_length }} of total upstream flows in at
+            {{ conf |fmt_latlng }}
+            at OSM node {{ conf['nid']|fmt_nid }}
+          {% endfor %}
+    {% endif %}
+    </li>
+  {% endfor %}
   {% for trib in tributaries %}
     <li data-name="{{ trib['name'] }}">
       {{ river_link_name(trib) }}

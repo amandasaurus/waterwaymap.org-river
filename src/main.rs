@@ -472,7 +472,7 @@ fn individual_river_pages(
             min_nid, length_m,
             stream_level, stream_level_code,
             branching_distributaries, terminal_distributaries, distributaries_sea,
-            side_channels, tributaries,
+            side_channels, tributaries, parent_rivers,
             extra_tag_values_fraction,
             to_char(latest_timestamp_iso AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS latest_timestamp_iso,
             to_char(latest_timestamp_iso AT TIME ZONE 'UTC',  'Dy, DD Mon YYYY HH24:MI') AS latest_timestamp_human,
@@ -568,6 +568,7 @@ fn individual_river_pages(
             "tributaries",
             "branching_distributaries",
             "terminal_distributaries",
+            "parent_rivers",
         ] {
             river[key]
                 .as_array_mut()
