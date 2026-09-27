@@ -115,7 +115,7 @@
   {% endif %}
   {% if other_lang_names|length > 0 %}
   In other languages {{ name }} is known as:
-  <ul>
+  <ul style="overflow-y: auto; max-height: 5lh">
 	  {% for other_lang in other_lang_names -%}
 	  <li>
 		<span title="name:{{ other_lang.code }}">{{ other_lang.lang_name }}</span>:&nbsp;
