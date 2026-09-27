@@ -463,43 +463,43 @@ fn individual_river_pages(
     let mut output_site_db_bulk_adder = output_site_db.start_bulk()?;
 
     let all_rivers_sql = conn1.prepare(
-        r#"
-	    select
-            ogc_fid,
-            tag_group_value as name,
-            (tag_group_value IS NULL) as is_unnamed,
-            url_path,
-            min_nid, length_m,
-            stream_level, stream_level_code,
-            branching_distributaries, terminal_distributaries, distributaries_sea,
-            side_channels, tributaries, parent_rivers,
-            extra_tag_values_fraction,
-            to_char(latest_timestamp_iso AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS latest_timestamp_iso,
-            to_char(latest_timestamp_iso AT TIME ZONE 'UTC',  'Dy, DD Mon YYYY HH24:MI') AS latest_timestamp_human,
-            json_array_length(objids) as num_osm_objects,
-            (select string_agg(objid, ',') from json_array_elements_text(objids) as objid) as objids_list,
-            ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
-            ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
-            from planet_grouped_waterways
-            ;
+		r#"
+		select
+			ogc_fid,
+			tag_group_value as name,
+			(tag_group_value IS NULL) as is_unnamed,
+			url_path,
+			min_nid, length_m,
+			stream_level, stream_level_code,
+			branching_distributaries, terminal_distributaries, distributaries_sea,
+			side_channels, tributaries, parent_rivers,
+			extra_tag_values_fraction,
+			to_char(latest_timestamp_iso AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS latest_timestamp_iso,
+			to_char(latest_timestamp_iso AT TIME ZONE 'UTC',  'Dy, DD Mon YYYY HH24:MI') AS latest_timestamp_human,
+			json_array_length(objids) as num_osm_objects,
+			(select string_agg(objid, ',') from json_array_elements_text(objids) as objid) as objids_list,
+			ST_AsGeoJSON(ST_Multi(coalesce(ST_Simplify(geom,0.00001), geom))) as geom,
+			ST_AsGeoJSON(ST_Expand(geom, 0.001)) as bbox
+			from planet_grouped_waterways
+			;
 	  "#,
-    )?;
+	)?;
 
     let river_in_admins_stmt = conn2.prepare(
         r#"select
-        a_name as name, a_iso, a_url_path as url_path
-        from ww_a
-        where ww_a.ww_ogc_fid = $1 and a_level = 0
+		a_name as name, a_iso, a_url_path as url_path
+		from ww_a
+		where ww_a.ww_ogc_fid = $1 and a_level = 0
 		order by a_name
-    "#,
+	"#,
     )?;
     let river_in_subregions_stmt = conn2.prepare(
         r#"select
-        a_name as name, a_url_path as url_path
-        from ww_a
-        where ww_a.ww_ogc_fid = $1 and a_level = 1 and a_parent_iso  = $2
-        order by a_name
-        "#,
+		a_name as name, a_url_path as url_path
+		from ww_a
+		where ww_a.ww_ogc_fid = $1 and a_level = 1 and a_parent_iso  = $2
+		order by a_name
+		"#,
     )?;
 
     let mut rivers_iter = conn1.query_raw(&all_rivers_sql, &[] as &[bool; 0])?; // [bool;0] is just
@@ -611,6 +611,7 @@ fn individual_river_pages(
             calc_wikipedias(&mut river, &langauge_codes, &etvf);
             calc_refs(&mut river, &etvf);
         }
+        calc_schema_org_micodata(&mut river);
 
         // Render the template!
         let content = template.render(&river)?;
@@ -1203,4 +1204,60 @@ fn calc_refs(river: &mut serde_json::Value, etvf: &ExtraTagValuesFraction) {
     let refs = refs.into_iter().map(|(k, v)| json!({"human_name": k, "tag": v.0, "items": v.1.into_iter().collect::<Vec<String>>()}) ).collect::<Vec<_>>();
 
     river["refs"] = refs.into();
+}
+
+fn calc_schema_org_micodata(river: &mut serde_json::Value) {
+    let mut json_ld = json!({
+      "@context": "https://schema.org",
+      "@type": "RiverBodyOfWater",
+    });
+
+    if let Some(name) = river.get("name").and_then(|x| x.as_str()) {
+        json_ld["name"] = name.into();
+    }
+
+    for other_name in river
+        .get("other_names")
+        .and_then(|x| x.as_array())
+        .map(|x| x.iter())
+        .into_iter()
+        .flatten()
+    {
+        if json_ld.get("alternateName").is_none() {
+            json_ld["alternateName"] = json!([]);
+        }
+        //dbg!(other_name);
+        json_ld["alternateName"]
+            .as_array_mut()
+            .unwrap()
+            .push(other_name.get("name").unwrap().to_owned());
+    }
+    for other_lang in river
+        .get("other_lang_names")
+        .and_then(|x| x.as_array())
+        .map(|x| x.iter())
+        .into_iter()
+        .flatten()
+    {
+        if json_ld.get("alternateName").is_none() {
+            json_ld["alternateName"] = json!([]);
+        }
+        let code = other_lang.get("code").clone();
+        for name in other_lang
+            .get("names")
+            .and_then(|x| x.as_array())
+            .into_iter()
+            .flatten()
+        {
+            json_ld["alternateName"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({
+                    "@langauge": code,
+                    "@value": name,
+                }));
+        }
+    }
+
+    river["schema_org_json"] = json_ld;
 }

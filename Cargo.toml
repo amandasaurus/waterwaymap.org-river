@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.6", features = ["derive"] }
-minijinja = { version = "2.24.0", features = ["loader"] }
+minijinja = { version = "2.24.0", features = ["json", "loader"] }
 rayon = "1.12.0"
 
 libsqlitesite = "0.2.0"

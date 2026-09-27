@@ -5,6 +5,7 @@
 
 {% block description %}{{name|default("This unnamed river", true)|xml_encode}} is {{length_m|fmt_length}} long, with {{ num_distributaries }} distributaries and {{ num_tributaries }} tributaries, with max. upstream of {{ max_upstream_m|fmt_length }}{% endblock %}
 {% block url_path %}{{ url }}{% endblock %}
+
 {% block extra_head_content %}
     <script src="{{ url_prefix }}js/river_map.js"></script>
   <script>
@@ -12,7 +13,11 @@
     set_up_map("{{ url }}geometry.geojson", {{bbox}});
   });
 </script>
+<script type="application/ld+json">
+{{ schema_org_json|tojson(true) }}
+</script>
 {% endblock %}
+
 {% block body %}
   <h1>{{ name|default("An unnamed river", true) }}</h1>
 
