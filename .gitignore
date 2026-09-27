@@ -10,3 +10,4 @@
 *.sqlitesite
 *.sqlitesite-journal
 *.gpkg
+*.osm.pbf
