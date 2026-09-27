@@ -1256,11 +1256,26 @@ fn calc_schema_org_micodata(river: &mut serde_json::Value) {
                 .as_array_mut()
                 .unwrap()
                 .push(json!({
-                    "@langauge": code,
+                    "@language": code,
                     "@value": name,
                 }));
         }
     }
+
+	for w in river.get("main_wikipedia").and_then(|x| x.as_array()).map(|x| x.iter()).into_iter().flatten() {
+        if json_ld.get("sameAs").is_none() {
+            json_ld["sameAs"] = json!([]);
+        }
+
+		json_ld["sameAs"].as_array_mut().unwrap().push(format!("https://{}.wikipedia.org/wiki/{}", w["lang_code"].as_str().unwrap(), w["article_name"].as_str().unwrap()).into());
+	}
+	for w in river.get("wikidata").and_then(|x| x.as_array()).map(|x| x.iter()).into_iter().flatten() {
+        if json_ld.get("sameAs").is_none() {
+            json_ld["sameAs"] = json!([]);
+        }
+
+		json_ld["sameAs"].as_array_mut().unwrap().push(format!("https://www.wikidata.org/entity/{}", w["wikidata"].as_str().unwrap()).into());
+	}
 
     river["schema_org_json"] = json_ld;
 }
