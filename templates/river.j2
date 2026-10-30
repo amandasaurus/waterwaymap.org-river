@@ -21,7 +21,7 @@
 {% block body %}
   <h1>{{ name|default("An unnamed river", true) }}</h1>
 
-  <p>Based on OpenStreetMap data, {{name|default("this unnamed river", true)}} is {{length_m|fmt_length}} long. It was last changed in OSM on <time datetime="{{ latest_timestamp_iso }}">{{ latest_timestamp_human }}</time></p>
+  <p>Based on OpenStreetMap data, {{name|default("this unnamed river", true)}} is {{length_m|fmt_length}} long. {% if cum_length_m > length_m %}The total length, incl. side channels is {{ cum_length_m|fmt_length }}.{% endif %} It was last changed in OSM on <time datetime="{{ latest_timestamp_iso }}">{{ latest_timestamp_human }}</time></p>
 
 
   {% if is_in_regions|length == 1 %}
@@ -111,7 +111,7 @@
   {% if other_names|default([])|length > 0 or other_lang_names|default([])|length > 0 %}
   <p>
   {% if other_names|length > 0 %}
-  This is also known as {% for other_name in other_names %}<span class="other_name">{{ other_name.name }}</span>{% if other_name.percent < 99 %}, for {{ other_name.length_m|fmt_length }} ({{ other_name.percent }}% total){% endif %}{{ loop.last|if_false(", ") }}{% endfor %}.
+  This is also known as {% for other_name in other_names %}“<span class="other_name">{{ other_name.name }}</span>”{% if other_name.percent < 99 %} for {{ other_name.length_m|fmt_length }} ({{ other_name.percent }}% total){% endif %}{{ loop.last|if_false(", ") }}{% endfor %}.
   {% endif %}
   {% if other_lang_names|length > 0 %}
   In other languages {{ name }} is known as:
@@ -152,7 +152,7 @@
 		{% endif %}
 	{% endif %}
     <a href="https://www.wikidata.org/entity/{{ wd.wikidata }}"><code>{{ wd.wikidata }}</code></a>
-	{% if wd.percent < 95 %}(for {{ wd.length_m|fmt_length }}, {{ wd.percent }}%)){% endif %}
+	{% if wd.percent < 95 %}(for {{ wd.length_m|fmt_length }} / {{ wd.percent }}%)){% endif %}
 	{{ (loop.length > 1 and loop.last)|if_false(", ") }}
 	{{ loop.last|if_true(".</p>") }}
   {% endfor %}
